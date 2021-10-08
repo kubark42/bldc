@@ -361,14 +361,9 @@ static inline void run_virtual_motor_mechanics(float ml){
 	// phi
 	virtual_motor.phi += virtual_motor.we * virtual_motor.Ts;
 
-	// phi limits
-	while( virtual_motor.phi > M_PI ){
-		virtual_motor.phi -= ( 2 * M_PI);
-	}
+	// Saturate phi
+	utils_norm_angle_rad((float *)&(virtual_motor.phi));
 
-	while( virtual_motor.phi < -1.0 * M_PI ){
-		virtual_motor.phi += ( 2 * M_PI);
-	}
 }
 
 /**
