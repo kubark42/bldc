@@ -492,14 +492,11 @@ void utils_fast_sincos_better(float angle, float *sin, float *cos) {
  * The value with the lowest magnitude.
  */
 float utils_min_abs(float va, float vb) {
-	float res;
 	if (fabsf(va) < fabsf(vb)) {
-		res = va;
+		return va;
 	} else {
-		res = vb;
+		return vb;
 	}
-
-	return res;
 }
 
 /**
@@ -515,14 +512,11 @@ float utils_min_abs(float va, float vb) {
  * The value with the highest magnitude.
  */
 float utils_max_abs(float va, float vb) {
-	float res;
 	if (fabsf(va) > fabsf(vb)) {
-		res = va;
+		return va;
 	} else {
-		res = vb;
+		return vb;
 	}
-
-	return res;
 }
 
 /**
