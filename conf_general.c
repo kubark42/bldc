@@ -1329,7 +1329,7 @@ static bool measure_r_l_imax(float current_min, float current_max,
 
 	*l = mcpwm_foc_measure_inductance_current(i_last, 100, 0, 0) * 1e-6;
 	*i_max = sqrtf(max_power_loss / *r / 1.5);
-	utils_truncate_number(i_max, HW_LIM_CURRENT);
+	utils_bound_number(i_max, HW_LIM_CURRENT);
 
 	mcconf->foc_motor_r = res_old;
 	mc_interface_set_configuration(mcconf);

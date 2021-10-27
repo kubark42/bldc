@@ -343,8 +343,8 @@ static inline void run_virtual_motor_electrical(float v_alpha, float v_beta){
 						* virtual_motor.Ts / virtual_motor.lq;
 
 //	// limit current maximum values
-	utils_truncate_number_abs((float *) &(virtual_motor.iq) , (2048 * FAC_CURRENT) );
-	utils_truncate_number_abs((float *) &(virtual_motor.id) , (2048 * FAC_CURRENT) );
+	utils_bound_number_abs((float *) &(virtual_motor.iq) , (2048 * FAC_CURRENT) );
+	utils_bound_number_abs((float *) &(virtual_motor.id) , (2048 * FAC_CURRENT) );
 }
 
 /**

@@ -946,7 +946,7 @@ void mcpwm_foc_set_handbrake(float current) {
  * The RPM to use.
  */
 void mcpwm_foc_set_openloop(float current, float rpm) {
-	utils_truncate_number(&current, -motor_now()->m_conf->l_current_max * motor_now()->m_conf->l_current_max_scale,
+	utils_bound_number(&current, -motor_now()->m_conf->l_current_max * motor_now()->m_conf->l_current_max_scale,
 						  motor_now()->m_conf->l_current_max * motor_now()->m_conf->l_current_max_scale);
 
 	motor_now()->m_control_mode = CONTROL_MODE_OPENLOOP;
@@ -972,7 +972,7 @@ void mcpwm_foc_set_openloop(float current, float rpm) {
  * The phase to use in degrees, range [0.0 360.0]
  */
 void mcpwm_foc_set_openloop_phase(float current, float phase) {
-	utils_truncate_number(&current, -motor_now()->m_conf->l_current_max * motor_now()->m_conf->l_current_max_scale,
+	utils_bound_number(&current, -motor_now()->m_conf->l_current_max * motor_now()->m_conf->l_current_max_scale,
 						  motor_now()->m_conf->l_current_max * motor_now()->m_conf->l_current_max_scale);
 
 	motor_now()->m_control_mode = CONTROL_MODE_OPENLOOP_PHASE;
@@ -2647,10 +2647,10 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		motor_now->m_motor_state.max_duty = conf_now->l_max_duty;
 
 		UTILS_LP_FAST(motor_now->m_duty_abs_filtered, fabsf(motor_now->m_motor_state.duty_now), 0.01);
-		utils_truncate_number_abs((float*)&motor_now->m_duty_abs_filtered, 1.0);
+		utils_bound_number_abs((float*)&motor_now->m_duty_abs_filtered, 1.0);
 
 		UTILS_LP_FAST(motor_now->m_duty_filtered, motor_now->m_motor_state.duty_now, 0.01);
-		utils_truncate_number_abs((float*)&motor_now->m_duty_filtered, 1.0);
+		utils_bound_number_abs((float*)&motor_now->m_duty_filtered, 1.0);
 
 		float duty_set = motor_now->m_duty_cycle_set;
 		bool control_duty = motor_now->m_control_mode == CONTROL_MODE_DUTY ||
@@ -2707,11 +2707,11 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				motor_now->m_duty_i_term += error * (conf_now->foc_duty_dowmramp_ki * dt) * scale;
 
 				// I-term wind-up protection
-				utils_truncate_number((float*)&motor_now->m_duty_i_term, -1.0, 1.0);
+				utils_bound_number((float*)&motor_now->m_duty_i_term, -1.0, 1.0);
 
 				// Calculate output
 				float output = p_term + motor_now->m_duty_i_term;
-				utils_truncate_number(&output, -1.0, 1.0);
+				utils_bound_number(&output, -1.0, 1.0);
 				iq_set_tmp = output * conf_now->lo_current_max;
 			} else {
 				// If the duty cycle is less than or equal to the set duty cycle just limit
@@ -2872,20 +2872,20 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		// Apply current limits
 		// TODO: Consider D axis current for the input current as well.
 		if (mod_q > 0.001) {
-			utils_truncate_number(&iq_set_tmp, conf_now->lo_in_current_min / mod_q, conf_now->lo_in_current_max / mod_q);
+			utils_bound_number(&iq_set_tmp, conf_now->lo_in_current_min / mod_q, conf_now->lo_in_current_max / mod_q);
 		} else if (mod_q < -0.001) {
-			utils_truncate_number(&iq_set_tmp, conf_now->lo_in_current_max / mod_q, conf_now->lo_in_current_min / mod_q);
+			utils_bound_number(&iq_set_tmp, conf_now->lo_in_current_max / mod_q, conf_now->lo_in_current_min / mod_q);
 		}
 
 		if (mod_q > 0.0) {
-			utils_truncate_number(&iq_set_tmp, conf_now->lo_current_min, conf_now->lo_current_max);
+			utils_bound_number(&iq_set_tmp, conf_now->lo_current_min, conf_now->lo_current_max);
 		} else {
-			utils_truncate_number(&iq_set_tmp, -conf_now->lo_current_max, -conf_now->lo_current_min);
+			utils_bound_number(&iq_set_tmp, -conf_now->lo_current_max, -conf_now->lo_current_min);
 		}
 
 		float current_max_abs = fabsf(utils_max_abs(conf_now->lo_current_max, conf_now->lo_current_min));
-		utils_truncate_number_abs(&id_set_tmp, current_max_abs);
-		utils_truncate_number_abs(&iq_set_tmp, sqrtf(SQ(current_max_abs) - SQ(id_set_tmp)));
+		utils_bound_number_abs(&id_set_tmp, current_max_abs);
+		utils_bound_number_abs(&iq_set_tmp, sqrtf(SQ(current_max_abs) - SQ(id_set_tmp)));
 
 		motor_now->m_motor_state.id_target = id_set_tmp;
 		motor_now->m_motor_state.iq_target = iq_set_tmp;
@@ -3008,7 +3008,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		// Based on angle difference
 		float diff = utils_angle_difference_rad(motor_now->m_motor_state.phase, motor_now->m_phase_before_speed_est);
-		utils_truncate_number(&diff, -M_PI / 3.0, M_PI / 3.0);
+		utils_bound_number(&diff, -M_PI / 3.0, M_PI / 3.0);
 
 		UTILS_LP_FAST(motor_now->m_speed_est_fast, diff / dt, 0.01);
 		UTILS_NAN_ZERO(motor_now->m_speed_est_fast);
@@ -3017,7 +3017,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		UTILS_NAN_ZERO(motor_now->m_speed_est_faster);
 
 		// pll wind-up protection
-		utils_truncate_number_abs((float*)&motor_now->m_pll_speed, fabsf(motor_now->m_speed_est_fast) * 3.0);
+		utils_bound_number_abs((float*)&motor_now->m_pll_speed, fabsf(motor_now->m_speed_est_fast) * 3.0);
 
 		motor_now->m_phase_before_speed_est = motor_now->m_motor_state.phase;
 	}
@@ -3026,7 +3026,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	float ph_tmp = motor_now->m_motor_state.phase;
 	utils_norm_angle_rad(&ph_tmp);
 	int step = (int)floorf((ph_tmp + M_PI) / (2.0 * M_PI) * 6.0);
-	utils_truncate_number_int(&step, 0, 5);
+	utils_bound_number_int(&step, 0, 5);
 	int diff = step - motor_now->m_tacho_step_last;
 	motor_now->m_tacho_step_last = step;
 
@@ -3224,7 +3224,7 @@ static void timer_update(volatile motor_all_state_t *motor, float dt) {
 			motor->m_conf->foc_openloop_rpm_low * motor->m_conf->foc_openloop_rpm,
 			motor->m_conf->foc_openloop_rpm);
 
-	utils_truncate_number_abs(&openloop_rpm_max, motor->m_conf->foc_openloop_rpm);
+	utils_bound_number_abs(&openloop_rpm_max, motor->m_conf->foc_openloop_rpm);
 
 	float openloop_rpm = openloop_rpm_max;
 	if (motor->m_conf->foc_sensor_mode != FOC_SENSOR_MODE_ENCODER) {
@@ -3237,7 +3237,7 @@ static void timer_update(volatile motor_all_state_t *motor, float dt) {
 		}
 	}
 
-	utils_truncate_number_abs(&openloop_rpm, openloop_rpm_max);
+	utils_bound_number_abs(&openloop_rpm, openloop_rpm_max);
 
 	float add_min_speed = 0.0;
 	if (motor->m_motor_state.duty_now > 0.0) {
@@ -3698,7 +3698,7 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	motor->m_cc_was_hfi = do_hfi;
 
 	float max_duty = fabsf(state_m->max_duty);
-	utils_truncate_number(&max_duty, 0.0, conf_now->l_max_duty);
+	utils_bound_number(&max_duty, 0.0, conf_now->l_max_duty);
 
 	state_m->id = c * state_m->i_alpha + s * state_m->i_beta;
 	state_m->iq = c * state_m->i_beta  - s * state_m->i_alpha;
@@ -3774,12 +3774,12 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	// Saturation and anti-windup. Notice that the d-axis has priority as it controls field
 	// weakening and the efficiency.
 	float vd_presat = state_m->vd;
-	utils_truncate_number_abs((float*)&state_m->vd, max_v_mag);
+	utils_bound_number_abs((float*)&state_m->vd, max_v_mag);
 	state_m->vd_int += (state_m->vd - vd_presat);
 
 	float max_vq = sqrtf(SQ(max_v_mag) - SQ(state_m->vd));
 	float vq_presat = state_m->vq;
-	utils_truncate_number_abs((float*)&state_m->vq, max_vq);
+	utils_bound_number_abs((float*)&state_m->vq, max_vq);
 	state_m->vq_int += (state_m->vq - vq_presat);
 
 	utils_saturate_vector_2d((float*)&state_m->vd, (float*)&state_m->vq, max_v_mag);
@@ -3821,7 +3821,7 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 									conf_now->foc_hfi_voltage_run, conf_now->foc_hfi_voltage_max);
 		}
 
-		utils_truncate_number_abs(&hfi_voltage, state_m->v_bus * (1.0 - fabsf(state_m->duty_now)) * SQRT3_BY_2 * (2.0 / 3.0) * 0.95);
+		utils_bound_number_abs(&hfi_voltage, state_m->v_bus * (1.0 - fabsf(state_m->duty_now)) * SQRT3_BY_2 * (2.0 / 3.0) * 0.95);
 
 		if (motor->m_hfi.is_samp_n) {
 			float sample_now = (utils_tab_sin_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * state_m->i_alpha -
@@ -4255,8 +4255,8 @@ static void run_pid_control_pos(float dt, volatile motor_all_state_t *motor) {
 
 	// I-term wind-up protection
 	float p_tmp = p_term;
-	utils_truncate_number_abs(&p_tmp, 1.0);
-	utils_truncate_number_abs((float*)&motor->m_pos_i_term, 1.0 - fabsf(p_tmp));
+	utils_bound_number_abs(&p_tmp, 1.0);
+	utils_bound_number_abs((float*)&motor->m_pos_i_term, 1.0 - fabsf(p_tmp));
 
 	// Store previous error
 	motor->m_pos_prev_error = error;
@@ -4264,7 +4264,7 @@ static void run_pid_control_pos(float dt, volatile motor_all_state_t *motor) {
 
 	// Calculate output
 	float output = p_term + motor->m_pos_i_term + d_term + d_term_proc;
-	utils_truncate_number(&output, -1.0, 1.0);
+	utils_bound_number(&output, -1.0, 1.0);
 
 	if (encoder_is_configured()) {
 		if (encoder_index_found()) {
@@ -4316,11 +4316,11 @@ static void run_pid_control_speed(float dt, volatile motor_all_state_t *motor) {
 	motor->m_speed_prev_error = error;
 
 	// Calculate output
-	utils_truncate_number_abs(&p_term, 1.0);
-	utils_truncate_number_abs(&d_term, 1.0);
+	utils_bound_number_abs(&p_term, 1.0);
+	utils_bound_number_abs(&d_term, 1.0);
 	float output = p_term + motor->m_speed_i_term + d_term;
 	float pre_output = output;
-	utils_truncate_number_abs(&output, 1.0);
+	utils_bound_number_abs(&output, 1.0);
 
 	float output_saturation = output - pre_output;
 

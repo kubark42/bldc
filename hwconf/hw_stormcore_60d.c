@@ -418,12 +418,12 @@ static THD_FUNCTION(switch_color_thread, arg) {
 	float left = mc_interface_get_battery_level(&wh_left);
 	if(left < 0.5){
 		float intense = utils_map(left,0.0, 0.5, 0.0, 1.0);
-		utils_truncate_number(&intense,0,1);
+		utils_bound_number(&intense,0,1);
 		switch_blue = intense;
 		switch_red  = 1.0-intense;
 	}else{
 		float intense = utils_map(left , 0.5, 1.0, 0.0, 1.0);
-		utils_truncate_number(&intense,0,1);
+		utils_bound_number(&intense,0,1);
 		switch_green = intense;
 		switch_blue  = 1.0-intense;
 	}
@@ -467,13 +467,13 @@ static THD_FUNCTION(switch_color_thread, arg) {
 			left = mc_interface_get_battery_level(&wh_left);
 			if(left < 0.5){
 				float intense = utils_map(left,0.0, 0.5, 0.0, 1.0);
-				utils_truncate_number(&intense,0,1);
+				utils_bound_number(&intense,0,1);
 				switch_blue = intense;
 				switch_red  = 1.0-intense;
 				switch_green = 0;
 			}else{
 				float intense = utils_map(left , 0.5, 1.0, 0.0, 1.0);
-				utils_truncate_number(&intense,0,1);
+				utils_bound_number(&intense,0,1);
 				switch_green = intense;
 				switch_blue  = 1.0-intense;
 				switch_red = 0;

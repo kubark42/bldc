@@ -82,7 +82,7 @@ void utils_norm_angle_rad(float *angle) {
 	}
 }
 
-int utils_truncate_number(float *number, float min, float max) {
+int utils_bound_number(float *number, float min, float max) {
 	int did_trunc = 0;
 
 	if (*number > max) {
@@ -96,7 +96,7 @@ int utils_truncate_number(float *number, float min, float max) {
 	return did_trunc;
 }
 
-int utils_truncate_number_int(int *number, int min, int max) {
+int utils_bound_number_int(int *number, int min, int max) {
 	int did_trunc = 0;
 
 	if (*number > max) {
@@ -110,7 +110,7 @@ int utils_truncate_number_int(int *number, int min, int max) {
 	return did_trunc;
 }
 
-int utils_truncate_number_abs(float *number, float max) {
+int utils_bound_number_abs(float *number, float max) {
 	int did_trunc = 0;
 
 	if (*number > max) {
@@ -133,8 +133,8 @@ int utils_map_int(int x, int in_min, int in_max, int out_min, int out_max) {
 }
 
 /**
- * Truncate absolute values less than tres to zero. The value
- * tres will be mapped to 0 and the value max to max.
+ * Set absolute values less than `tres` to zero. The value
+ * `tres` will be mapped to 0 and the value `max` to `max`.
  */
 void utils_deadband(float *value, float tres, float max) {
 	if (fabsf(*value) < tres) {
@@ -331,7 +331,7 @@ float utils_fast_atan2(float y, float x) {
 }
 
 /**
- * Truncate the magnitude of a vector.
+ * Saturate the magnitude of a vector.
  *
  * @param x
  * The first component.
@@ -796,7 +796,7 @@ float utils_batt_liion_norm_v_to_capacity(float norm_v) {
 	// constants for polynomial fit of lithium ion battery
 	const float li_p[] = {
 						  -2.979767, 5.487810, -3.501286, 1.675683, 0.317147};
-	utils_truncate_number(&norm_v,0.0,1.0);
+	utils_bound_number(&norm_v,0.0,1.0);
 	float v2 = norm_v*norm_v;
 	float v3 = v2*norm_v;
 	float v4 = v3*norm_v;

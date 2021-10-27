@@ -390,7 +390,7 @@ float gpdrive_get_last_adc_isr_duration(void) {
 // Private functions
 
 static void set_modulation(float mod) {
-	utils_truncate_number_abs(&mod, m_conf->l_max_duty);
+	utils_bound_number_abs(&mod, m_conf->l_max_duty);
 	m_mod_now = mod;
 
 	if (m_output_mode == GPD_OUTPUT_MODE_NONE || mc_interface_get_fault() != FAULT_CODE_NONE) {
@@ -604,7 +604,7 @@ static void adc_int_handler(void *p, uint32_t flags) {
 			float err = m_current_state.current_set - m_current_now_filtered;
 			m_current_state.voltage_now = m_current_state.voltage_int + err * m_conf->gpd_current_kp;
 			m_current_state.voltage_int += err * m_conf->gpd_current_ki * (1.0 / m_fsw_now);
-			utils_truncate_number_abs((float*)&m_current_state.voltage_int, v_in);
+			utils_bound_number_abs((float*)&m_current_state.voltage_int, v_in);
 			set_modulation(m_current_state.voltage_now / v_in);
 		}
 	}

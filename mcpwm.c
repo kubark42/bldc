@@ -640,7 +640,7 @@ void mcpwm_set_current(float current) {
 		return;
 	}
 
-	utils_truncate_number(&current, -conf->l_current_max * conf->l_current_max_scale,
+	utils_bound_number(&current, -conf->l_current_max * conf->l_current_max_scale,
 			conf->l_current_max * conf->l_current_max_scale);
 
 	control_mode = CONTROL_MODE_CURRENT;
@@ -665,7 +665,7 @@ void mcpwm_set_brake_current(float current) {
 		return;
 	}
 
-	utils_truncate_number(&current, -fabsf(conf->lo_current_min), fabsf(conf->lo_current_min));
+	utils_bound_number(&current, -fabsf(conf->lo_current_min), fabsf(conf->lo_current_min));
 
 	control_mode = CONTROL_MODE_CURRENT_BRAKE;
 	current_set = current;
@@ -968,7 +968,7 @@ static void full_brake_hw(void) {
  * the motor phases will be shorted to brake the motor.
  */
 static void set_duty_cycle_hl(float dutyCycle) {
-	utils_truncate_number(&dutyCycle, -conf->l_max_duty, conf->l_max_duty);
+	utils_bound_number(&dutyCycle, -conf->l_max_duty, conf->l_max_duty);
 
 	if (state == MC_STATE_DETECTING) {
 		stop_pwm_ll();
@@ -1111,7 +1111,7 @@ static void set_duty_cycle_hw(float dutyCycle) {
 	timer_tmp = timer_struct;
 	utils_sys_unlock_cnt();
 
-	utils_truncate_number(&dutyCycle, conf->l_min_duty, conf->l_max_duty);
+	utils_bound_number(&dutyCycle, conf->l_min_duty, conf->l_max_duty);
 
 	if (conf->motor_type == MOTOR_TYPE_DC) {
 		switching_frequency_now = conf->m_dc_f_sw;
@@ -1177,14 +1177,14 @@ static void run_pid_control_speed(void) {
 	d_term = d_filter;
 
 	// I-term wind-up protection
-	utils_truncate_number(&i_term, -1.0, 1.0);
+	utils_bound_number(&i_term, -1.0, 1.0);
 
 	// Store previous error
 	prev_error = error;
 
 	// Calculate output
 	float output = p_term + i_term + d_term;
-	utils_truncate_number(&output, -1.0, 1.0);
+	utils_bound_number(&output, -1.0, 1.0);
 
 	// Optionally disable braking
 	if (!conf->s_pid_allow_braking) {
@@ -1217,7 +1217,7 @@ static void run_pid_control_speed(void) {
 	d_term = d_filter;
 
 	// I-term wind-up protection
-	utils_truncate_number(&i_term, -1.0, 1.0);
+	utils_bound_number(&i_term, -1.0, 1.0);
 
 	// Store previous error
 	prev_error = error;
@@ -1270,14 +1270,14 @@ static void run_pid_control_pos(float dt, float pos_now) {
 	d_term = d_filter;
 
 	// I-term wind-up protection
-	utils_truncate_number(&i_term, -1.0, 1.0);
+	utils_bound_number(&i_term, -1.0, 1.0);
 
 	// Store previous error
 	prev_error = error;
 
 	// Calculate output
 	float output = p_term + i_term + d_term;
-	utils_truncate_number(&output, -1.0, 1.0);
+	utils_bound_number(&output, -1.0, 1.0);
 
 	current_set = output * conf->lo_current_max;
 }
@@ -1429,7 +1429,7 @@ static THD_FUNCTION(timer_thread, arg) {
 			} else {
 				dutycycle_now = -amp / (float)ADC_Value[ADC_IND_VIN_SENS];
 			}
-			utils_truncate_number((float*)&dutycycle_now, -conf->l_max_duty, conf->l_max_duty);
+			utils_bound_number((float*)&dutycycle_now, -conf->l_max_duty, conf->l_max_duty);
 		} else {
 			tachometer_for_direction = 0;
 		}
@@ -1985,7 +1985,7 @@ void mcpwm_adc_int_handler(void *p, uint32_t flags) {
 			const float start_boost = conf->cc_startup_boost_duty * voltage_scale;
 
 			// Do not ramp too much
-			utils_truncate_number(&step, -conf->cc_ramp_step_max, conf->cc_ramp_step_max);
+			utils_bound_number(&step, -conf->cc_ramp_step_max, conf->cc_ramp_step_max);
 
 			// Switching frequency correction
 			step /= switching_frequency_now / 1000.0;
@@ -2006,7 +2006,7 @@ void mcpwm_adc_int_handler(void *p, uint32_t flags) {
 			}
 
 			// Upper truncation
-			utils_truncate_number((float*)&dutycycle_now_tmp, -conf->l_max_duty, conf->l_max_duty);
+			utils_bound_number((float*)&dutycycle_now_tmp, -conf->l_max_duty, conf->l_max_duty);
 
 			// Lower truncation
 			if (fabsf(dutycycle_now_tmp) < conf->l_min_duty) {
@@ -2026,7 +2026,7 @@ void mcpwm_adc_int_handler(void *p, uint32_t flags) {
 			float step = error * conf->cc_gain * voltage_scale;
 
 			// Do not ramp too much
-			utils_truncate_number(&step, -conf->cc_ramp_step_max, conf->cc_ramp_step_max);
+			utils_bound_number(&step, -conf->cc_ramp_step_max, conf->cc_ramp_step_max);
 
 			// Switching frequency correction
 			step /= switching_frequency_now / 1000.0;
@@ -2039,7 +2039,7 @@ void mcpwm_adc_int_handler(void *p, uint32_t flags) {
 			dutycycle_now_tmp += SIGN(dutycycle_now_tmp) * step;
 
 			// Upper truncation
-			utils_truncate_number((float*)&dutycycle_now_tmp, -conf->l_max_duty, conf->l_max_duty);
+			utils_bound_number((float*)&dutycycle_now_tmp, -conf->l_max_duty, conf->l_max_duty);
 
 			// Lower truncation
 			if (fabsf(dutycycle_now_tmp) < conf->l_min_duty) {

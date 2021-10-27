@@ -504,8 +504,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		*mcconf = *mc_interface_get_configuration();
 
 		if (confgenerator_deserialize_mcconf(data, mcconf)) {
-			utils_truncate_number(&mcconf->l_current_max_scale , 0.0, 1.0);
-			utils_truncate_number(&mcconf->l_current_min_scale , 0.0, 1.0);
+			utils_bound_number(&mcconf->l_current_max_scale , 0.0, 1.0);
+			utils_bound_number(&mcconf->l_current_min_scale , 0.0, 1.0);
 
 #ifdef HW_HAS_DUAL_MOTORS
 			mcconf->motor_type = MOTOR_TYPE_FOC;
@@ -1644,8 +1644,8 @@ void commands_send_appconf(COMM_PACKET_ID packet_id, app_configuration *appconf)
 inline static float hw_lim_upper(float l, float h) {(void)l; return h;}
 
 void commands_apply_mcconf_hw_limits(mc_configuration *mcconf) {
-	utils_truncate_number(&mcconf->l_current_max_scale, 0.0, 1.0);
-	utils_truncate_number(&mcconf->l_current_min_scale, 0.0, 1.0);
+	utils_bound_number(&mcconf->l_current_max_scale, 0.0, 1.0);
+	utils_bound_number(&mcconf->l_current_min_scale, 0.0, 1.0);
 
 	float ctrl_loop_freq = 0.0;
 
@@ -1654,71 +1654,71 @@ void commands_apply_mcconf_hw_limits(mc_configuration *mcconf) {
 #ifdef HW_LIM_FOC_CTRL_LOOP_FREQ
     if (mcconf->foc_sample_v0_v7 == true) {
     	//control loop executes twice per pwm cycle when sampling in v0 and v7
-		utils_truncate_number(&mcconf->foc_f_sw, HW_LIM_FOC_CTRL_LOOP_FREQ);
+		utils_bound_number(&mcconf->foc_f_sw, HW_LIM_FOC_CTRL_LOOP_FREQ);
 		ctrl_loop_freq = mcconf->foc_f_sw;
     } else {
 #ifdef HW_HAS_DUAL_MOTORS
-    	utils_truncate_number(&mcconf->foc_f_sw, HW_LIM_FOC_CTRL_LOOP_FREQ);
-    	ctrl_loop_freq = mcconf->foc_f_sw;
+		utils_bound_number(&mcconf->foc_f_sw, HW_LIM_FOC_CTRL_LOOP_FREQ);
+		ctrl_loop_freq = mcconf->foc_f_sw;
 #else
-		utils_truncate_number(&mcconf->foc_f_sw, HW_LIM_FOC_CTRL_LOOP_FREQ * 2.0);
+		utils_bound_number(&mcconf->foc_f_sw, HW_LIM_FOC_CTRL_LOOP_FREQ * 2.0);
 		ctrl_loop_freq = mcconf->foc_f_sw / 2.0;
 #endif
     }
 #endif
 
-    if (ctrl_loop_freq >= (hw_lim_upper(HW_LIM_FOC_CTRL_LOOP_FREQ) * 0.9)) {
-    	utils_truncate_number_int(&mcconf->m_hall_extra_samples, 0, 2);
-    } else if (ctrl_loop_freq >= (hw_lim_upper(HW_LIM_FOC_CTRL_LOOP_FREQ) * 0.7)) {
-    	utils_truncate_number_int(&mcconf->m_hall_extra_samples, 0, 4);
-    } else {
-    	utils_truncate_number_int(&mcconf->m_hall_extra_samples, 0, 10);
-    }
+	if (ctrl_loop_freq >= (hw_lim_upper(HW_LIM_FOC_CTRL_LOOP_FREQ) * 0.9)) {
+		utils_bound_number_int(&mcconf->m_hall_extra_samples, 0, 2);
+	} else if (ctrl_loop_freq >= (hw_lim_upper(HW_LIM_FOC_CTRL_LOOP_FREQ) * 0.7)) {
+		utils_bound_number_int(&mcconf->m_hall_extra_samples, 0, 4);
+	} else {
+		utils_bound_number_int(&mcconf->m_hall_extra_samples, 0, 10);
+	}
 
 #ifndef DISABLE_HW_LIMITS
 
-    // TODO: Maybe truncate values that get close to numerical instabilities when set
-    // close to each other, such as
-    //
-    // conf->l_temp_motor_start, conf->l_temp_motor_end
-    // and
-    // conf->l_temp_fet_start, conf->l_temp_fet_end
-    //
-    // A division by 0 is avoided in the code, but getting close can still make things
-    // oscillate. At the moment we leave the responsibility of setting sane values
-    // to the user.
+	// TODO: Maybe bound values that get close to numerical instabilities when set
+	// close to each other, such as
+	//
+	// conf->l_temp_motor_start, conf->l_temp_motor_end
+	// and
+	// conf->l_temp_fet_start, conf->l_temp_fet_end
+	//
+	// A division by 0 is avoided in the code, but getting close can still make things
+	// oscillate. At the moment we leave the responsibility of setting sane values
+	// to the user.
 
 #ifdef HW_LIM_CURRENT
-	utils_truncate_number(&mcconf->l_current_max, HW_LIM_CURRENT);
-	utils_truncate_number(&mcconf->l_current_min, HW_LIM_CURRENT);
+	utils_bound_number(&mcconf->l_current_max, HW_LIM_CURRENT);
+	utils_bound_number(&mcconf->l_current_min, HW_LIM_CURRENT);
 #endif
 #ifdef HW_LIM_CURRENT_IN
-	utils_truncate_number(&mcconf->l_in_current_max, HW_LIM_CURRENT_IN);
-	utils_truncate_number(&mcconf->l_in_current_min, HW_LIM_CURRENT);
+	utils_bound_number(&mcconf->l_in_current_max, HW_LIM_CURRENT_IN);
+	utils_bound_number(&mcconf->l_in_current_min, HW_LIM_CURRENT);
 #endif
 #ifdef HW_LIM_CURRENT_ABS
-	utils_truncate_number(&mcconf->l_abs_current_max, HW_LIM_CURRENT_ABS);
+	utils_bound_number(&mcconf->l_abs_current_max, HW_LIM_CURRENT_ABS);
 #endif
 #ifdef HW_LIM_VIN
-	utils_truncate_number(&mcconf->l_max_vin, HW_LIM_VIN);
-	utils_truncate_number(&mcconf->l_min_vin, HW_LIM_VIN);
+	utils_bound_number(&mcconf->l_max_vin, HW_LIM_VIN);
+	utils_bound_number(&mcconf->l_min_vin, HW_LIM_VIN);
 #endif
 #ifdef HW_LIM_ERPM
-	utils_truncate_number(&mcconf->l_max_erpm, HW_LIM_ERPM);
-	utils_truncate_number(&mcconf->l_min_erpm, HW_LIM_ERPM);
+	utils_bound_number(&mcconf->l_max_erpm, HW_LIM_ERPM);
+	utils_bound_number(&mcconf->l_min_erpm, HW_LIM_ERPM);
 #endif
 #ifdef HW_LIM_DUTY_MIN
-	utils_truncate_number(&mcconf->l_min_duty, HW_LIM_DUTY_MIN);
+	utils_bound_number(&mcconf->l_min_duty, HW_LIM_DUTY_MIN);
 #endif
 #ifdef HW_LIM_DUTY_MAX
-	utils_truncate_number(&mcconf->l_max_duty, HW_LIM_DUTY_MAX);
+	utils_bound_number(&mcconf->l_max_duty, HW_LIM_DUTY_MAX);
 #endif
 #ifdef HW_LIM_TEMP_FET
-	utils_truncate_number(&mcconf->l_temp_fet_start, HW_LIM_TEMP_FET);
-	utils_truncate_number(&mcconf->l_temp_fet_end, HW_LIM_TEMP_FET);
+	utils_bound_number(&mcconf->l_temp_fet_start, HW_LIM_TEMP_FET);
+	utils_bound_number(&mcconf->l_temp_fet_end, HW_LIM_TEMP_FET);
 #endif
 #ifdef HW_FOC_CURRENT_FILTER_LIM
-	utils_truncate_number(&mcconf->foc_current_filter_const, HW_FOC_CURRENT_FILTER_LIM);
+	utils_bound_number(&mcconf->foc_current_filter_const, HW_FOC_CURRENT_FILTER_LIM);
 #endif
 #endif
 }

@@ -168,8 +168,8 @@ static THD_FUNCTION(adc_thread, arg) {
 			break;
 		}
 
-		// Truncate the read voltage
-		utils_truncate_number(&pwr, 0.0, 1.0);
+		// Bound the read voltage
+		utils_bound_number(&pwr, 0.0, 1.0);
 
 		// Optionally invert the read voltage
 		if (config.voltage_inverted) {

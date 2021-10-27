@@ -198,7 +198,7 @@ static THD_FUNCTION(pas_thread, arg) {
 				// just use on/off control (which is what setting the limits to the same value essentially means).
 				if (config.pedal_rpm_end > (config.pedal_rpm_start + 1.0)) {
 					output = utils_map(pedal_rpm, config.pedal_rpm_start, config.pedal_rpm_end, 0.0, config.current_scaling);
-					utils_truncate_number(&output, 0.0, config.current_scaling);
+					utils_bound_number(&output, 0.0, config.current_scaling);
 				} else {
 					if (pedal_rpm > config.pedal_rpm_end) {
 						output = config.current_scaling;
@@ -222,7 +222,7 @@ static THD_FUNCTION(pas_thread, arg) {
 		if (ramp_time > 0.01) {
 			const float ramp_step = (float)ST2MS(chVTTimeElapsedSinceX(last_time)) / (ramp_time * 1000.0);
 			utils_step_towards(&output_ramp, output, ramp_step);
-			utils_truncate_number(&output_ramp, 0.0, config.current_scaling);
+			utils_bound_number(&output_ramp, 0.0, config.current_scaling);
 
 			last_time = chVTGetSystemTimeX();
 			output = output_ramp;

@@ -66,7 +66,7 @@ static float calculateAccConfidence(float acc_confidence_decay, float accMag, fl
 	*accMagP = accMag;
 
 	confidence = 1.0 - (acc_confidence_decay * sqrtf(fabsf(accMag - 1.0f)));
-	utils_truncate_number(&confidence, 0.0, 1.0);
+	utils_bound_number(&confidence, 0.0, 1.0);
 
 	return confidence;
 }

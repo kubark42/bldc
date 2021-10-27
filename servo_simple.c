@@ -90,7 +90,7 @@ void servo_simple_set_output(float out) {
 		return;
 	}
 
-	utils_truncate_number(&out, 0.0, 1.0);
+	utils_bound_number(&out, 0.0, 1.0);
 
 	float us = (float)SERVO_OUT_PULSE_MIN_US + out *
 			(float)(SERVO_OUT_PULSE_MAX_US - SERVO_OUT_PULSE_MIN_US);
