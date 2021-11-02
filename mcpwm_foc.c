@@ -285,6 +285,29 @@ static volatile bool pid_thd_stop;
 #define M_MOTOR(is_second_motor)  (((void)is_second_motor), &m_motor_1)
 #endif
 
+/**
+ * @brief prbsGenerator Generates a -1/+1 noise signal from a pseudo-random
+ *        binary sequence with an 11-bit period
+ * @return -1 or 1
+ */
+int32_t prbsGenerator11(void) {
+	static uint32_t prbs;
+	static uint32_t lfsr = 0x01;  /* Any nonzero start state less than 2^bits will work. */
+
+	const uint32_t taps =  (1<< 11) | (1<<9); // https://en.wikipedia.org/wiki/Linear-feedback_shift_register#Example_polynomials_for_maximal_LFSRs
+
+	bool lsb = lfsr & 0x01;  // Get LSB (i.e., the output bit).
+	prbs = prbs + lsb;
+	lfsr >>= 1;  // Shift register
+
+	// Only apply toggle mask if output bit is 1.
+	if (lsb == true) {
+		lfsr ^= taps;  // Apply toggle mask, value has 1 at bits corresponding to taps, 0 elsewhere.
+	}
+
+	return (lsb == true) ? 1 : -1;
+}
+
 static void update_hfi_samples(foc_hfi_samples samples, volatile motor_all_state_t *motor) {
 	utils_sys_lock_cnt();
 
@@ -3784,10 +3807,19 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	utils_truncate_number_abs((float*)&state_m->vq, max_vq);
 	state_m->vq_int += (state_m->vq - vq_presat);
 
-	utils_saturate_vector_2d((float*)&state_m->vd, (float*)&state_m->vq, max_v_mag);
 
-	state_m->mod_d = state_m->vd / ((2.0 / 3.0) * state_m->v_bus);
-	state_m->mod_q = state_m->vq / ((2.0 / 3.0) * state_m->v_bus);
+	float noiseScale = conf_now->foc_hfi_voltage_max;
+
+	// Inject PRBS noise
+	float noise = prbsGenerator11();
+	float vd_noised = state_m->vd + noise * noiseScale;
+	float vq_noised = state_m->vq;
+
+	utils_saturate_vector_2d(&vd_noised, &vq_noised, max_v_mag);
+
+	// Calculate the modulation. This controls the duty cycle.
+	state_m->mod_d = vd_noised / ((2.0 / 3.0) * state_m->v_bus);
+	state_m->mod_q = vq_noised / ((2.0 / 3.0) * state_m->v_bus);
 
 	// TODO: Have a look at this?
 #ifdef HW_HAS_INPUT_CURRENT_SENSOR
