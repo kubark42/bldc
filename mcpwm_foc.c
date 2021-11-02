@@ -294,7 +294,7 @@ int32_t prbsGenerator11(void) {
 	static uint32_t prbs;
 	static uint32_t lfsr = 0x01;  /* Any nonzero start state less than 2^bits will work. */
 
-	const uint32_t taps =  (1<< 11) | (1<<9); // https://en.wikipedia.org/wiki/Linear-feedback_shift_register#Example_polynomials_for_maximal_LFSRs
+	const uint32_t taps =  (1<< (11-1)) | (1<<(9-1)); // https://en.wikipedia.org/wiki/Linear-feedback_shift_register#Example_polynomials_for_maximal_LFSRs
 
 	bool lsb = lfsr & 0x01;  // Get LSB (i.e., the output bit).
 	prbs = prbs + lsb;
