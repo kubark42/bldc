@@ -3757,8 +3757,8 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	float Ierr_d = state_m->id_target - state_m->id;
 	float Ierr_q = state_m->iq_target - state_m->iq;
 
-	state_m->vd = state_m->vd_int + Ierr_d * conf_now->foc_current_kp * d_gain_scale;
-	state_m->vq = state_m->vq_int + Ierr_q * conf_now->foc_current_kp;
+	float pi_d = state_m->vd_int + Ierr_d * conf_now->foc_current_kp * d_gain_scale;
+	float pi_q = state_m->vq_int + Ierr_q * conf_now->foc_current_kp;
 
 	// Temperature compensation
 	const float t = mc_interface_temp_motor_filtered();
@@ -3800,35 +3800,36 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 		}
 	}
 
-	state_m->vd -= dec_vd;
-	state_m->vq += dec_vq + dec_bemf;
+	// Add in the feed-forward term.
+	// TODO: Justify why one is `+` and one is `-`.
+	float vd_tmp = pi_d - dec_vd;
+	float vq_tmp = pi_q + dec_vq + dec_bemf;
 
 	float max_v_mag = (2.0 / 3.0) * max_duty * SQRT3_BY_2 * state_m->v_bus;
 
 	// Saturation and anti-windup. Notice that the d-axis has priority as it controls field
 	// weakening and the efficiency.
-	float vd_presat = state_m->vd;
-	utils_truncate_number_abs((float*)&state_m->vd, max_v_mag);
-	state_m->vd_int += (state_m->vd - vd_presat);
+	float vd_presat = vd_tmp;
+	utils_truncate_number_abs((float*)&vd_tmp, max_v_mag);
+	state_m->vd_int += (vd_tmp - vd_presat);
 
-	float max_vq = sqrtf(SQ(max_v_mag) - SQ(state_m->vd));
-	float vq_presat = state_m->vq;
-	utils_truncate_number_abs((float*)&state_m->vq, max_vq);
-	state_m->vq_int += (state_m->vq - vq_presat);
+	float max_vq = sqrtf(SQ(max_v_mag) - SQ(vd_tmp));
+	float vq_presat = vq_tmp;
+	utils_truncate_number_abs((float*)&vq_tmp, max_vq);
+	state_m->vq_int += (vq_tmp - vq_presat);
 
 
 	float noiseScale = conf_now->foc_hfi_voltage_max;
 
 	// Generate PRBS noise
 	int noise = prbsGenerator11();
-	float vd_noised = state_m->vd + noise * noiseScale;
-	float vq_noised = state_m->vq;
+	state_m->vd = vd_tmp + noise * noiseScale;
+	state_m->vq = vq_tmp;
 
-	utils_saturate_vector_2d(&vd_noised, &vq_noised, max_v_mag);
+	utils_saturate_vector_2d((float*)&state_m->vd, (float*)&state_m->vq, max_v_mag);
 
-	// Calculate the modulation. This controls the duty cycle.
-	state_m->mod_d = vd_noised / ((2.0 / 3.0) * state_m->v_bus);
-	state_m->mod_q = vq_noised / ((2.0 / 3.0) * state_m->v_bus);
+	state_m->mod_d = state_m->vd / ((2.0 / 3.0) * state_m->v_bus);
+	state_m->mod_q = state_m->vq / ((2.0 / 3.0) * state_m->v_bus);
 
 	// TODO: Have a look at this?
 #ifdef HW_HAS_INPUT_CURRENT_SENSOR
