@@ -3821,16 +3821,7 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 
 	// Generate PRBS noise
 	int noise = prbsGenerator11();
-	float tmp_vd_noised = state_m->vd + noise * noiseScale;
-	float vd_noised;
-
-	// Only apply the noise if the output is within bounds
-	if (tmp_vd_noised >= 0 && tmp_vd_noised <= state_m->v_bus) {
-		vd_noised = tmp_vd_noised;
-	} else  {
-		vd_noised = state_m->vd;
-	}
-
+	float vd_noised = state_m->vd + noise * noiseScale;
 	float vq_noised = state_m->vq;
 
 	utils_saturate_vector_2d(&vd_noised, &vq_noised, max_v_mag);
