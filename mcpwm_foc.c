@@ -285,19 +285,28 @@ static volatile bool pid_thd_stop;
 #define M_MOTOR(is_second_motor)  (((void)is_second_motor), &m_motor_1)
 #endif
 
+
+static bool lsb;
+
+bool mcpwm_foc_get_prbs(void) {
+   return lsb;
+}
+
 /**
  * @brief prbsGenerator Generates a -1/+1 noise signal from a pseudo-random
- *        binary sequence with an 11-bit period
+ *        binary sequence with an 11-bit period. Every time this function is
+ *        called, the binary sequences advances one tick.
+ *        C.f. https://blog.kurttomlinson.com/posts/prbs-pseudo-random-binary-sequence
+ *        C.f. https://en.wikipedia.org/wiki/Pseudorandom_binary_sequence
+ *        C.f. https://en.wikipedia.org/wiki/Linear-feedback_shift_register#Example_polynomials_for_maximal_LFSRs
  * @return -1 or 1
  */
 int32_t prbsGenerator11(void) {
-	static uint32_t prbs;
 	static uint32_t lfsr = 0x01;  /* Any nonzero start state less than 2^bits will work. */
 
 	const uint32_t taps =  (1<< (11-1)) | (1<<(9-1)); // https://en.wikipedia.org/wiki/Linear-feedback_shift_register#Example_polynomials_for_maximal_LFSRs
 
-	bool lsb = lfsr & 0x01;  // Get LSB (i.e., the output bit).
-	prbs = prbs + lsb;
+	lsb = lfsr & 0x01;  // Get LSB (i.e., the output bit).
 	lfsr >>= 1;  // Shift register
 
 	// Only apply toggle mask if output bit is 1.
@@ -3810,9 +3819,18 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 
 	float noiseScale = conf_now->foc_hfi_voltage_max;
 
-	// Inject PRBS noise
-	float noise = prbsGenerator11();
-	float vd_noised = state_m->vd + noise * noiseScale;
+	// Generate PRBS noise
+	int noise = prbsGenerator11();
+	float tmp_vd_noised = state_m->vd + noise * noiseScale;
+	float vd_noised;
+
+	// Only apply the noise if the output is within bounds
+	if (tmp_vd_noised >= 0 && tmp_vd_noised <= state_m->v_bus) {
+		vd_noised = tmp_vd_noised;
+	} else  {
+		vd_noised = state_m->vd;
+	}
+
 	float vq_noised = state_m->vq;
 
 	utils_saturate_vector_2d(&vd_noised, &vq_noised, max_v_mag);

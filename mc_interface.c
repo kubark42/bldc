@@ -2005,10 +2005,15 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 			}
 
 			m_vzero_samples[m_sample_now] = zero;
-			m_curr_fir_samples[m_sample_now] = (int16_t)(current * (8.0 / FAC_CURRENT));
 			m_f_sw_samples[m_sample_now] = (int16_t)(f_samp / 10.0);
-			m_status_samples[m_sample_now] = mcpwm_get_comm_step() | (mcpwm_read_hall_phase() << 3);
+			if (1) {
+				m_curr_fir_samples[m_sample_now] = (int16_t)(mcpwm_foc_get_vd() * 1000 + 0.5);
+				m_status_samples[m_sample_now] = (mcpwm_foc_get_prbs() << 7) | (((mcpwm_read_hall_phase() << 3) | mcpwm_get_comm_step()) & 0x7F) ;
 
+			} else {
+				m_curr_fir_samples[m_sample_now] = (int16_t)(current * (8.0 / FAC_CURRENT));
+				m_status_samples[m_sample_now] = mcpwm_get_comm_step() | (mcpwm_read_hall_phase() << 3);
+			}
 			m_sample_now++;
 
 			m_last_adc_duration_sample = mc_interface_get_last_inj_adc_isr_duration();
