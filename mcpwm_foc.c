@@ -3846,8 +3846,6 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 
 	update_valpha_vbeta(motor, mod_alpha, mod_beta);
 
-	state_m->vd = c * motor->m_motor_state.v_alpha + s * motor->m_motor_state.v_beta;
-	state_m->vq = c * motor->m_motor_state.v_beta  - s * motor->m_motor_state.v_alpha;
 
 	// HFI
 	if (do_hfi) {
