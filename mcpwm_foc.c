@@ -3808,7 +3808,8 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	float vd_tmp = pi_d - dec_vd;
 	float vq_tmp = pi_q + dec_vq + dec_bemf;
 
-	float max_v_mag = (2.0 / 3.0) * max_duty * SQRT3_BY_2 * state_m->v_bus;
+	/* max_v_mag = 2/3*max_duty * sqrt(3)/2*V_bus */
+	float max_v_mag = ONE_BY_SQRT3 * max_duty * state_m->v_bus;
 
 	// Saturation and anti-windup. Notice that the d-axis has priority as it controls field
 	// weakening and the efficiency.
@@ -3889,13 +3890,13 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 			}
 
 			mod_alpha_tmp += hfi_voltage * utils_tab_sin_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * voltageNormalize;
-			mod_beta_tmp -= hfi_voltage * utils_tab_cos_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * voltageNormalize;
+			mod_beta_tmp  -= hfi_voltage * utils_tab_cos_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * voltageNormalize;
 		} else {
 			motor->m_hfi.prev_sample = utils_tab_sin_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * state_m->i_alpha -
 					utils_tab_cos_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * state_m->i_beta;
 
 			mod_alpha_tmp -= hfi_voltage * utils_tab_sin_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * voltageNormalize;
-			mod_beta_tmp += hfi_voltage * utils_tab_cos_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * voltageNormalize;
+			mod_beta_tmp  += hfi_voltage * utils_tab_cos_32_1[motor->m_hfi.ind * motor->m_hfi.table_fact] * voltageNormalize;
 		}
 
 		utils_saturate_vector_2d(&mod_alpha_tmp, &mod_beta_tmp, SQRT3_BY_2 * 0.95);
@@ -3999,8 +4000,12 @@ static void update_valpha_vbeta(volatile motor_all_state_t *motor, float mod_alp
 	const float ia_filter = i_alpha_filter;
 	const float ib_filter = -0.5 * i_alpha_filter + SQRT3_BY_2 * i_beta_filter;
 	const float ic_filter = -0.5 * i_alpha_filter - SQRT3_BY_2 * i_beta_filter;
-	const float mod_alpha_filter_sgn = (2.0 / 3.0) * SIGN(ia_filter) - (1.0 / 3.0) * SIGN(ib_filter) - (1.0 / 3.0) * SIGN(ic_filter);
-	const float mod_beta_filter_sgn = ONE_BY_SQRT3 * SIGN(ib_filter) - ONE_BY_SQRT3 * SIGN(ic_filter);
+
+	/* mod_alpha_sign = 2/3*sign(ia) - 1/3*sign(ib) - 1/3*sign(ic) */
+	/* mod_beta_sign  = 1/sqrt(3)*sign(ib) - 1/sqrt(3)*sign(ic) */
+	const float mod_alpha_filter_sgn = (1.0 / 3.0) * (2 * SIGN(ia_filter) - SIGN(ib_filter) - SIGN(ic_filter));
+	const float mod_beta_filter_sgn = ONE_BY_SQRT3 * (SIGN(ib_filter) - SIGN(ic_filter));
+
 	const float mod_comp_fact = conf_now->foc_dt_us * 1e-6 * conf_now->foc_f_sw;
 	const float mod_alpha_comp = mod_alpha_filter_sgn * mod_comp_fact;
 	const float mod_beta_comp = mod_beta_filter_sgn * mod_comp_fact;
@@ -4014,8 +4019,10 @@ static void update_valpha_vbeta(volatile motor_all_state_t *motor, float mod_alp
 	state_m->mod_alpha_measured = mod_alpha;
 	state_m->mod_beta_measured = mod_beta;
 
-	float v_alpha = (2.0 / 3.0) * Va - (1.0 / 3.0) * Vb - (1.0 / 3.0) * Vc;
-	float v_beta = ONE_BY_SQRT3 * Vb - ONE_BY_SQRT3 * Vc;
+	/* v_alpha = 2/3*Va - 1/3*Vb -1/3*Vc */
+	/* v_beta  = 1/sqrt(3)*Vb - 1/sqrt(3)*Vc */
+	float v_alpha = (1.0 / 3.0) * (2 * Va - Vb - Vc);
+	float v_beta = ONE_BY_SQRT3 * (Vb - Vc);
 
 	// Keep the modulation updated so that the filter stays updated
 	// even when the motor is undriven.
@@ -4090,22 +4097,34 @@ static void update_valpha_vbeta(volatile motor_all_state_t *motor, float mod_alp
 	}
 }
 
-// Magnitude must not be larger than sqrt(3)/2, or 0.866
+/**
+ * @brief svm Space vector modulation. Magnitude must not be larger than sqrt(3)/2, or 0.866.
+ * @param alpha
+ * @param beta
+ * @param PWMHalfPeriod
+ * @param tAout
+ * @param tBout
+ * @param tCout
+ * @param svm_sector
+ */
 static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 				uint32_t* tAout, uint32_t* tBout, uint32_t* tCout, uint32_t *svm_sector) {
 	uint32_t sector;
 
+   float beta13 = ONE_BY_SQRT3 * beta;
+   float beta23 = 2*beta13;  // beta * 2/sqrt(3)
+
 	if (beta >= 0.0f) {
 		if (alpha >= 0.0f) {
 			//quadrant I
-			if (ONE_BY_SQRT3 * beta > alpha) {
+			if (beta13 > alpha) {
 				sector = 2;
 			} else {
 				sector = 1;
 			}
 		} else {
 			//quadrant II
-			if (-ONE_BY_SQRT3 * beta > alpha) {
+			if (-beta13 > alpha) {
 				sector = 3;
 			} else {
 				sector = 2;
@@ -4114,14 +4133,14 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	} else {
 		if (alpha >= 0.0f) {
 			//quadrant IV5
-			if (-ONE_BY_SQRT3 * beta > alpha) {
+			if (-beta13 > alpha) {
 				sector = 5;
 			} else {
 				sector = 6;
 			}
 		} else {
 			//quadrant III
-			if (ONE_BY_SQRT3 * beta > alpha) {
+			if (beta13 > alpha) {
 				sector = 4;
 			} else {
 				sector = 5;
@@ -4137,8 +4156,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	// sector 1-2
 	case 1: {
 		// Vector on-times
-		uint32_t t1 = (alpha - ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
-		uint32_t t2 = (TWO_BY_SQRT3 * beta) * PWMHalfPeriod;
+		uint32_t t1 = (alpha - beta13) * PWMHalfPeriod;
+		uint32_t t2 = beta23 * PWMHalfPeriod;
 
 		// PWM timings
 		tA = (PWMHalfPeriod - t1 - t2) / 2;
@@ -4151,8 +4170,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	// sector 2-3
 	case 2: {
 		// Vector on-times
-		uint32_t t2 = (alpha + ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
-		uint32_t t3 = (-alpha + ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
+		uint32_t t2 = (alpha + beta13) * PWMHalfPeriod;
+		uint32_t t3 = (-alpha + beta13) * PWMHalfPeriod;
 
 		// PWM timings
 		tB = (PWMHalfPeriod - t2 - t3) / 2;
@@ -4165,8 +4184,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	// sector 3-4
 	case 3: {
 		// Vector on-times
-		uint32_t t3 = (TWO_BY_SQRT3 * beta) * PWMHalfPeriod;
-		uint32_t t4 = (-alpha - ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
+		uint32_t t3 = beta23 * PWMHalfPeriod;
+		uint32_t t4 = (-alpha - beta13) * PWMHalfPeriod;
 
 		// PWM timings
 		tB = (PWMHalfPeriod - t3 - t4) / 2;
@@ -4179,8 +4198,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	// sector 4-5
 	case 4: {
 		// Vector on-times
-		uint32_t t4 = (-alpha + ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
-		uint32_t t5 = (-TWO_BY_SQRT3 * beta) * PWMHalfPeriod;
+		uint32_t t4 = (-alpha + beta13) * PWMHalfPeriod;
+		uint32_t t5 = -beta23 * PWMHalfPeriod;
 
 		// PWM timings
 		tC = (PWMHalfPeriod - t4 - t5) / 2;
@@ -4193,8 +4212,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	// sector 5-6
 	case 5: {
 		// Vector on-times
-		uint32_t t5 = (-alpha - ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
-		uint32_t t6 = (alpha - ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
+		uint32_t t5 = (-alpha - beta13) * PWMHalfPeriod;
+		uint32_t t6 = (alpha - beta13) * PWMHalfPeriod;
 
 		// PWM timings
 		tC = (PWMHalfPeriod - t5 - t6) / 2;
@@ -4207,8 +4226,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 	// sector 6-1
 	case 6: {
 		// Vector on-times
-		uint32_t t6 = (-TWO_BY_SQRT3 * beta) * PWMHalfPeriod;
-		uint32_t t1 = (alpha + ONE_BY_SQRT3 * beta) * PWMHalfPeriod;
+		uint32_t t6 = -beta23 * PWMHalfPeriod;
+		uint32_t t1 = (alpha + beta13) * PWMHalfPeriod;
 
 		// PWM timings
 		tA = (PWMHalfPeriod - t6 - t1) / 2;
