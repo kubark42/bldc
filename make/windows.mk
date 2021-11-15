@@ -9,4 +9,4 @@
 ############################
 
 RM := del
-MKDIR := pwsh -noprofile -command New-Item -itemtype "directory"
+MKDIR := pwsh -noprofile -command New-Item -Force -itemtype "directory"
