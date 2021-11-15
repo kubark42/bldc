@@ -88,6 +88,7 @@ help:
 	@echo "     fw_<board>   - Build firmware for target <board>"
 	@echo "     PROJECT=<target> fw   - Build firmware for <target>"
 	@echo "     fw_<board>_clean     - Remove firmware for <board>"
+	@echo "     fw_<board>_flash     - Use OpenOCD + SWD/JTAG to write firmware to <target>"
 	@echo
 	@echo "   Hint: Add V=1 to your command line to see verbose build output."
 	@echo
@@ -123,6 +124,11 @@ fw_$(1)_vescfw:
 		PROJECT="$(1)-$(GIT_HASH)$(GIT_DIRTY_LABEL)" \
 		build_args='-DHW_SOURCE=\"hw_$(1).c\" -DHW_HEADER=\"hw_$(1).h\"' USE_VERBOSE_COMPILE=no
 
+fw_$(1)_flash: fw_$(1)_vescfw fw_$(1)_flash_only
+
+fw_$(1)_flash_only:
+	@echo "********* PROGRAM: $(1) **********"
+	$(V1) openocd -f board/stm32f4discovery.cfg -c "reset_config trst_only combined" -c "program $(BUILDDIR)/$(PROJECT)-$(1).elf verify reset exit"
 
 .PHONY: $(1)_clean
 $(1)_clean: fw_$(1)_clean
@@ -132,11 +138,6 @@ fw_$(1)_clean:
 	$(V0) @echo " CLEAN      $$@"
 	$(V1) [ ! -d "$(BUILD_DIR)/$(1)" ] || $(RM) -r "$(BUILD_DIR)/$(1)"
 endef
-
-upload: fw upload_only
-
-upload_only:
-	$(V1) openocd -f board/stm32f4discovery.cfg -c "reset_config trst_only combined" -c "program build/$(PROJECT).elf verify reset exit"
 
 clear_option_bytes:
 	$(V1) openocd -f board/stm32f4discovery.cfg -c "init" -c "stm32f2x unlock 0" -c "mww 0x40023C08 0x08192A3B; mww 0x40023C08 0x4C5D6E7F; mww 0x40023C14 0x0fffaaed" -c "exit"
