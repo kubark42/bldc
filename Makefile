@@ -59,8 +59,7 @@ endif
 
 # Get the git commit hash
 GIT_HASH := $(shell git rev-parse --short HEAD)
-GIT_DIRTY_LABEL := $(shell git diff --quiet || echo '-dirty')
-
+GIT_DIRTY_LABEL := $(shell git diff --quiet || echo -dirty)
 
 
 ##############################
