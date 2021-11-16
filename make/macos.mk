@@ -24,4 +24,4 @@ endif
 ############################
 
 RM := rm
-MKDIR: mkdir -p
+MKDIR := mkdir -p

@@ -43,4 +43,4 @@ export PYTHON
 ############################
 
 RM := rm
-MKDIR: mkdir -p
+MKDIR := mkdir -p
