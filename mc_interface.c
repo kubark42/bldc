@@ -2702,15 +2702,17 @@ static THD_FUNCTION(sample_send_thread, arg) {
 	sample_send_tp = chThdGetSelfX();
 
 	for(;;) {
+		// Block until an event is in the queue
 		chEvtWaitAny((eventmask_t) 1);
 
 		int len = 0;
-		int offset = 0;
+		int ind_samp;
 
 		switch (m_sample_mode_last) {
 		case DEBUG_SAMPLING_NOW:
 		case DEBUG_SAMPLING_START:
 			len = m_sample_len;
+			ind_samp = 0;
 			break;
 
 		case DEBUG_SAMPLING_TRIGGER_START:
@@ -2718,7 +2720,9 @@ static THD_FUNCTION(sample_send_thread, arg) {
 		case DEBUG_SAMPLING_TRIGGER_START_NOSEND:
 		case DEBUG_SAMPLING_TRIGGER_FAULT_NOSEND:
 			len = ADC_SAMPLE_MAX_LEN;
-			offset = m_sample_trigger - m_sample_len;
+
+			// Offset the index to allow for `m_sample_len` samples before the triggering event
+			ind_samp = m_sample_trigger - m_sample_len;
 			break;
 
 		case DEBUG_SAMPLING_OFF:
@@ -2727,18 +2731,9 @@ static THD_FUNCTION(sample_send_thread, arg) {
 			break;
 		}
 
-		for (int i = 0;i < len;i++) {
+		for (int i = 0; i < len; i++) {
 			uint8_t buffer[39];  // 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1
 			int32_t index = 0;
-			int ind_samp = i + offset;
-
-			while (ind_samp >= ADC_SAMPLE_MAX_LEN) {
-				ind_samp -= ADC_SAMPLE_MAX_LEN;
-			}
-
-			while (ind_samp < 0) {
-				ind_samp += ADC_SAMPLE_MAX_LEN;
-			}
 
 			buffer[index++] = COMM_SAMPLE_PRINT;
 
@@ -2766,6 +2761,14 @@ static THD_FUNCTION(sample_send_thread, arg) {
 			buffer[index++] = m_phase_samples[ind_samp];
 
 			commands_send_packet(buffer, index);
+
+			// Increment sample index
+			ind_samp++;
+
+			// Wrap circular buffer head
+			if (ind_samp >= ADC_SAMPLE_MAX_LEN) {
+				ind_samp = 0;
+			}
 		}
 	}
 }
