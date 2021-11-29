@@ -116,8 +116,8 @@ static volatile int m_sample_int;
 static volatile bool m_sample_raw;
 static volatile debug_sampling_mode m_sample_mode;
 static volatile debug_sampling_mode m_sample_mode_last;
-static volatile int m_sample_now;
-static volatile int m_sample_trigger;
+static volatile int m_sample_cnt;
+static volatile int m_sample_trigger_idx;
 static volatile float m_last_adc_duration_sample;
 static volatile bool m_sample_is_second_motor;
 static volatile mc_fault_code m_fault_stop_fault;
@@ -164,9 +164,9 @@ void mc_interface_init(void) {
 	m_last_adc_duration_sample = 0.0;
 	m_sample_len = 1000;
 	m_sample_int = 1;
-	m_sample_now = 0;
+	m_sample_cnt = 0;
 	m_sample_raw = false;
-	m_sample_trigger = 0;
+	m_sample_trigger_idx = 0;  // Shouldn't this be `-1`?
 	m_sample_mode = DEBUG_SAMPLING_OFF;
 	m_sample_mode_last = DEBUG_SAMPLING_OFF;
 	m_sample_is_second_motor = false;
@@ -1435,8 +1435,8 @@ void mc_interface_sample_print_data(debug_sampling_mode mode, uint16_t len, uint
 	if (mode == DEBUG_SAMPLING_SEND_LAST_SAMPLES) {
 		chEvtSignal(sample_send_tp, (eventmask_t) 1);
 	} else {
-		m_sample_trigger = -1;
-		m_sample_now = 0;
+		m_sample_trigger_idx = -1;
+		m_sample_cnt = 0;
 		m_sample_len = len;
 		m_sample_int = decimation;
 		m_sample_mode = mode;
@@ -1922,7 +1922,7 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 	switch (sample_mode) {
 	case DEBUG_SAMPLING_NOW:
 		// Check if we have reached the requested number of samples
-		if (m_sample_now == m_sample_len) {
+		if (m_sample_cnt == m_sample_len) {
 			// Turn sampling off
 			m_sample_mode = DEBUG_SAMPLING_OFF;
 
@@ -1939,11 +1939,11 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 	case DEBUG_SAMPLING_START:
 		// Wait until the state is running before triggering the
 		// capture. However, once it is running, keep running.
-		if (state == MC_STATE_RUNNING || m_sample_now > 0) {
+		if (state == MC_STATE_RUNNING || m_sample_cnt > 0) {
 			sample = true;
 		}
 
-		if (m_sample_now == m_sample_len) {
+		if (m_sample_cnt == m_sample_len) {
 			m_sample_mode_last = m_sample_mode;
 			m_sample_mode = DEBUG_SAMPLING_OFF;
 
@@ -1959,20 +1959,21 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 		// Always save the sample, even if we don't use it
 		sample = true;
 
-		int sample_last = -1;
+		int sample_last_idx = -1;
+
 		// If the sample trigger index is non-negative, then the window has been triggered
-		if (m_sample_trigger >= 0) {
+		if (m_sample_trigger_idx >= 0) {
 			// Offset the last sample index by the length
-			sample_last = m_sample_trigger - m_sample_len;
+			sample_last_idx = m_sample_trigger_idx - m_sample_len;
 
 			// Ensure the last index is a positive value in the circular buffer
-			if (sample_last < 0) {
-				sample_last += ADC_SAMPLE_MAX_LEN;
+			if (sample_last_idx < 0) {
+				sample_last_idx += ADC_SAMPLE_MAX_LEN;
 			}
 		}
 
 		// Check if the current sample is the last sample
-		if (m_sample_now == sample_last) {
+		if (m_sample_cnt == sample_last_idx) {
 			m_sample_mode_last = m_sample_mode;
 			sample = false;
 
@@ -1988,14 +1989,14 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 
 		// If the sample trigger index is negative, then the sample window has not
 		// been triggered yet.
-		if (m_sample_trigger < 0) {
+		if (m_sample_trigger_idx < 0) {
 			// Check the conditions which would trigger the beginning of the sample window
 			switch (sample_mode) {
 			case DEBUG_SAMPLING_TRIGGER_START:
 			case DEBUG_SAMPLING_TRIGGER_START_NOSEND: {
 				// Don't trigger until the state switches to running
 				if (state == MC_STATE_RUNNING) {
-					m_sample_trigger = m_sample_now;
+					m_sample_trigger_idx = m_sample_cnt;
 				}
 			} break;
 
@@ -2003,7 +2004,7 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 			case DEBUG_SAMPLING_TRIGGER_FAULT_NOSEND: {
 				// Don't trigger until a fault code arises
 				if (motor->m_fault_now != FAULT_CODE_NONE) {
-					m_sample_trigger = m_sample_now;
+					m_sample_trigger_idx = m_sample_cnt;
 				}
 			} break;
 
@@ -2028,8 +2029,9 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 		if (a >= m_sample_int) {
 			a = 0;
 
-			if (m_sample_now >= ADC_SAMPLE_MAX_LEN) {
-				m_sample_now = 0;
+			// Why not do this immediately after incrementing `m_sample_cnt`?
+			if (m_sample_cnt >= ADC_SAMPLE_MAX_LEN) {
+				m_sample_cnt = 0;
 			}
 
 			int16_t zero;
@@ -2039,53 +2041,53 @@ void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configur
 				} else {
 					zero = (ADC_V_L1 + ADC_V_L2 + ADC_V_L3) / 3;
 				}
-				m_phase_samples[m_sample_now] = (uint8_t)(mcpwm_foc_get_phase() / 360.0 * 250.0);
+				m_phase_samples[m_sample_cnt] = (uint8_t)(mcpwm_foc_get_phase() / 360.0 * 250.0);
 //				m_phase_samples[m_sample_now] = (uint8_t)(mcpwm_foc_get_phase_observer() / 360.0 * 250.0);
 //				float ang = utils_angle_difference(mcpwm_foc_get_phase_observer(), mcpwm_foc_get_phase_encoder()) + 180.0;
 //				m_phase_samples[m_sample_now] = (uint8_t)(ang / 360.0 * 250.0);
 			} else {
 				zero = mcpwm_vzero;
-				m_phase_samples[m_sample_now] = 0;
+				m_phase_samples[m_sample_cnt] = 0;
 			}
 
 			if (state == MC_STATE_DETECTING) {
-				m_curr0_samples[m_sample_now] = (int16_t)mcpwm_detect_currents[mcpwm_get_comm_step() - 1];
-				m_curr1_samples[m_sample_now] = (int16_t)mcpwm_detect_currents_diff[mcpwm_get_comm_step() - 1];
+				m_curr0_samples[m_sample_cnt] = (int16_t)mcpwm_detect_currents[mcpwm_get_comm_step() - 1];
+				m_curr1_samples[m_sample_cnt] = (int16_t)mcpwm_detect_currents_diff[mcpwm_get_comm_step() - 1];
 
-				m_ph1_samples[m_sample_now] = (int16_t)mcpwm_detect_voltages[0];
-				m_ph2_samples[m_sample_now] = (int16_t)mcpwm_detect_voltages[1];
-				m_ph3_samples[m_sample_now] = (int16_t)mcpwm_detect_voltages[2];
+				m_ph1_samples[m_sample_cnt] = (int16_t)mcpwm_detect_voltages[0];
+				m_ph2_samples[m_sample_cnt] = (int16_t)mcpwm_detect_voltages[1];
+				m_ph3_samples[m_sample_cnt] = (int16_t)mcpwm_detect_voltages[2];
 			} else {
 				if (is_second_motor) {
-					m_curr0_samples[m_sample_now] = ADC_curr_norm_value[3];
-					m_curr1_samples[m_sample_now] = ADC_curr_norm_value[4];
+					m_curr0_samples[m_sample_cnt] = ADC_curr_norm_value[3];
+					m_curr1_samples[m_sample_cnt] = ADC_curr_norm_value[4];
 
-					m_ph1_samples[m_sample_now] = ADC_V_L4 - zero;
-					m_ph2_samples[m_sample_now] = ADC_V_L5 - zero;
-					m_ph3_samples[m_sample_now] = ADC_V_L6 - zero;
+					m_ph1_samples[m_sample_cnt] = ADC_V_L4 - zero;
+					m_ph2_samples[m_sample_cnt] = ADC_V_L5 - zero;
+					m_ph3_samples[m_sample_cnt] = ADC_V_L6 - zero;
 				} else {
-					m_curr0_samples[m_sample_now] = ADC_curr_norm_value[0];
-					m_curr1_samples[m_sample_now] = ADC_curr_norm_value[1];
+					m_curr0_samples[m_sample_cnt] = ADC_curr_norm_value[0];
+					m_curr1_samples[m_sample_cnt] = ADC_curr_norm_value[1];
 
-					m_ph1_samples[m_sample_now] = ADC_V_L1 - zero;
-					m_ph2_samples[m_sample_now] = ADC_V_L2 - zero;
-					m_ph3_samples[m_sample_now] = ADC_V_L3 - zero;
+					m_ph1_samples[m_sample_cnt] = ADC_V_L1 - zero;
+					m_ph2_samples[m_sample_cnt] = ADC_V_L2 - zero;
+					m_ph3_samples[m_sample_cnt] = ADC_V_L3 - zero;
 				}
 			}
 
-			m_vzero_samples[m_sample_now] = zero;
-			m_curr_fir_samples[m_sample_now] = (int16_t)(current * (8.0 / FAC_CURRENT));
-			m_f_sw_samples[m_sample_now] = (int16_t)(f_samp / 10.0);
+			m_vzero_samples[m_sample_cnt] = zero;
+			m_curr_fir_samples[m_sample_cnt] = (int16_t)(current * (8.0 / FAC_CURRENT));
+			m_f_sw_samples[m_sample_cnt] = (int16_t)(f_samp / 10.0);
 
 			if (conf_now->foc_prbs_channel == PRBS_CHANNEL_D) {
-				m_frf_samples_mV[m_sample_now] = (int16_t)(mcpwm_foc_get_vd() * 1000 + 0.5);
+				m_frf_samples_mV[m_sample_cnt] = (int16_t)(mcpwm_foc_get_vd() * 1000 + 0.5);
 			} else if (conf_now->foc_prbs_channel == PRBS_CHANNEL_Q) {
-				m_frf_samples_mV[m_sample_now] = (int16_t)(mcpwm_foc_get_vq() * 1000 + 0.5);
+				m_frf_samples_mV[m_sample_cnt] = (int16_t)(mcpwm_foc_get_vq() * 1000 + 0.5);
 			}
 
-			m_status_samples[m_sample_now] = (mcpwm_foc_get_prbs() << 7) | (((mcpwm_read_hall_phase() << 3) | mcpwm_get_comm_step()) & 0x7F);
+			m_status_samples[m_sample_cnt] = (mcpwm_foc_get_prbs() << 7) | (((mcpwm_read_hall_phase() << 3) | mcpwm_get_comm_step()) & 0x7F);
 
-			m_sample_now++;
+			m_sample_cnt++;
 
 			m_last_adc_duration_sample = mc_interface_get_last_inj_adc_isr_duration();
 		}
@@ -2741,7 +2743,7 @@ static THD_FUNCTION(sample_send_thread, arg) {
 			len = ADC_SAMPLE_MAX_LEN;
 
 			// Offset the index to allow for `m_sample_len` samples before the triggering event
-			ind_samp = m_sample_trigger - m_sample_len;
+			ind_samp = m_sample_trigger_idx - m_sample_len;
 			break;
 
 		case DEBUG_SAMPLING_OFF:
