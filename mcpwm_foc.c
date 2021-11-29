@@ -2506,23 +2506,26 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #ifdef HW_HAS_DUAL_MOTORS
 	bool is_second_motor = is_v7;
 	norm_curr_ofs = is_second_motor ? 3 : 0;
-	volatile motor_all_state_t *motor_now = is_second_motor ? &m_motor_2 : &m_motor_1;
-	volatile motor_all_state_t *motor_other = is_second_motor ? &m_motor_1 : &m_motor_2;
+	motor_all_state_t *motor_now = is_second_motor ? &m_motor_2 : &m_motor_1;
+	motor_all_state_t *motor_other = is_second_motor ? &m_motor_1 : &m_motor_2;
 	m_isr_motor = is_second_motor ? 2 : 1;
 #ifdef HW_HAS_3_SHUNTS
 	volatile TIM_TypeDef *tim = is_second_motor ? TIM8 : TIM1;
 #endif
 #else
-	volatile motor_all_state_t *motor_other = &m_motor_1;
-	volatile motor_all_state_t *motor_now = &m_motor_1;;
+	// This looks weird, but it's intentional. In a dual motor system, one motor is `now` and the second is
+	// `other`. However, this is a single motor system so they are both one and the same.
+	motor_all_state_t *motor_now = (motor_all_state_t *)&m_motor_1;
+	motor_all_state_t *motor_other = motor_now;
 	m_isr_motor = 1;
 #ifdef HW_HAS_3_SHUNTS
 	volatile TIM_TypeDef *tim = TIM1;
 #endif
 #endif
 
-	volatile mc_configuration *conf_now = motor_now->m_conf;
+	mc_configuration *conf_now = (mc_configuration *)motor_now->m_conf;
 
+	// Check if the second motor (if dual motor) or primary motor (if single)...
 	if (motor_other->m_duty_next_set) {
 		motor_other->m_duty_next_set = false;
 #ifdef HW_HAS_DUAL_MOTORS
@@ -2685,8 +2688,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	UTILS_LP_FAST(motor_now->m_motor_state.v_bus, GET_INPUT_VOLTAGE(), 0.1);
 
-	volatile float enc_ang = 0;
-	volatile bool encoder_is_being_used = false;
+	float enc_ang = 0;
+	bool encoder_is_being_used = false;
 
 	if (virtual_motor_is_connected()) {
 		if (conf_now->foc_sensor_mode == FOC_SENSOR_MODE_ENCODER ) {
