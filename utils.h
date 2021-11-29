@@ -87,6 +87,9 @@ const char* utils_hw_type_to_string(HW_TYPE hw);
 #define RPM2RADPS_f(rpm) ((rpm) * (float)((2.0 * M_PI) / 60.0))
 #define RADPS2RPM_f(rad_per_sec) ((rad_per_sec) * (float)(60.0 / (2.0 * M_PI)))
 
+// Min and max macros
+#define MIN(x,y) ((x<y) ? x : y)
+#define MAX(x,y) ((x>y) ? x : y)
 
 
 
