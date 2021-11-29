@@ -2630,10 +2630,12 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	if (conf_now->foc_sample_v0_v7) {
 		dt = 1.0 / conf_now->foc_f_sw;
 	} else {
-		dt = 1.0 / (conf_now->foc_f_sw / 2.0);
+		// dt = 1 / (f_sw/2)
+		dt = 2.0 / (conf_now->foc_f_sw);
 	}
 #else
-	float dt = 1.0 / (conf_now->foc_f_sw / 2.0);
+	// dt = 1 / (f_sw/2)
+	float dt = 2.0 / (conf_now->foc_f_sw);
 #endif
 
 	// This has to be done for the skip function to have any chance at working with the
