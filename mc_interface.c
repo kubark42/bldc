@@ -1996,7 +1996,9 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		}
 	} break;
 
-	default:
+	case DEBUG_SAMPLING_OFF:
+	case DEBUG_SAMPLING_SEND_LAST_SAMPLES:
+		// Do nothing
 		break;
 	}
 
@@ -2719,7 +2721,9 @@ static THD_FUNCTION(sample_send_thread, arg) {
 			offset = m_sample_trigger - m_sample_len;
 			break;
 
-		default:
+		case DEBUG_SAMPLING_OFF:
+		case DEBUG_SAMPLING_SEND_LAST_SAMPLES:
+			// Do nothing
 			break;
 		}
 
