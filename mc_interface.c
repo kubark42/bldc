@@ -128,6 +128,7 @@ static void update_override_limits(volatile motor_if_state_t *motor, volatile mc
 static void run_timer_tasks(volatile motor_if_state_t *motor);
 static void update_stats(volatile motor_if_state_t *motor);
 static volatile motor_if_state_t *motor_now(void);
+static inline void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configuration *conf_now, float current, float f_samp, bool is_second_motor);
 
 // Function pointers
 static void(*pwn_done_func)(void) = 0;
@@ -1906,6 +1907,10 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		}
 	}
 
+	process_trace_sampling(state, motor, conf_now, current, f_samp, is_second_motor);
+}
+
+void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configuration *conf_now, float current, float f_samp, bool is_second_motor) {
 	bool sample = false;
 
 	// Turn off sampling if the current motor doesn't correspond to the requested motor
