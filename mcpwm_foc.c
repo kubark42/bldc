@@ -112,7 +112,7 @@ typedef struct {
 	mc_state m_state;
 	mc_control_mode m_control_mode;
 	motor_state_t m_motor_state;
-	float m_curr_unbalance;
+	float m_curr_imbalance;
 	float m_currents_adc[3];
 	bool m_phase_override;
 	float m_phase_now_override;
@@ -1293,7 +1293,7 @@ float mcpwm_foc_get_abs_motor_current(void) {
  * The magnitude of the phase currents unbalance.
  */
 float mcpwm_foc_get_abs_motor_current_unbalance(void) {
-	return motor_now()->m_curr_unbalance * FAC_CURRENT;
+	return motor_now()->m_curr_imbalance * FAC_CURRENT;
 }
 
 /**
@@ -2545,7 +2545,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	curr1 -= conf_now->foc_offsets_current[1];
 #ifdef HW_HAS_3_SHUNTS
 	curr2 -= conf_now->foc_offsets_current[2];
-	motor_now->m_curr_unbalance = curr0 + curr1 + curr2;
+	motor_now->m_curr_imbalance = curr0 + curr1 + curr2;
 #endif
 
 	ADC_curr_norm_value[0 + norm_curr_ofs] = curr0;
