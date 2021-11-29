@@ -1938,61 +1938,66 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		}
 		break;
 
+	/* This is the block of triggered conditions */
 	case DEBUG_SAMPLING_TRIGGER_START:
-	case DEBUG_SAMPLING_TRIGGER_START_NOSEND: {
-		sample = true;
-
-		int sample_last = -1;
-		if (m_sample_trigger >= 0) {
-			sample_last = m_sample_trigger - m_sample_len;
-			if (sample_last < 0) {
-				sample_last += ADC_SAMPLE_MAX_LEN;
-			}
-		}
-
-		if (m_sample_now == sample_last) {
-			m_sample_mode_last = m_sample_mode;
-			sample = false;
-
-			if (m_sample_mode == DEBUG_SAMPLING_TRIGGER_START) {
-				chSysLockFromISR();
-				chEvtSignalI(sample_send_tp, (eventmask_t) 1);
-				chSysUnlockFromISR();
-			}
-
-			m_sample_mode = DEBUG_SAMPLING_OFF;
-		}
-
-		if (state == MC_STATE_RUNNING && m_sample_trigger < 0) {
-			m_sample_trigger = m_sample_now;
-		}
-	} break;
-
+	case DEBUG_SAMPLING_TRIGGER_START_NOSEND:
 	case DEBUG_SAMPLING_TRIGGER_FAULT:
 	case DEBUG_SAMPLING_TRIGGER_FAULT_NOSEND: {
+		// Always save the sample, even if we don't use it
 		sample = true;
 
 		int sample_last = -1;
+		// If the sample trigger index is non-negative, then the window has been triggered
 		if (m_sample_trigger >= 0) {
+			// Offset the last sample index by the length
 			sample_last = m_sample_trigger - m_sample_len;
+
+			// Ensure the last index is a positive value in the circular buffer
 			if (sample_last < 0) {
 				sample_last += ADC_SAMPLE_MAX_LEN;
 			}
 		}
 
+		// Check if the current sample is the last sample
 		if (m_sample_now == sample_last) {
 			m_sample_mode_last = m_sample_mode;
 			sample = false;
 
-			if (m_sample_mode == DEBUG_SAMPLING_TRIGGER_FAULT) {
+			// Check if we should send data
+			if (m_sample_mode == DEBUG_SAMPLING_TRIGGER_START ||
+				 m_sample_mode == DEBUG_SAMPLING_TRIGGER_FAULT) {
 				lock_send_unlock(sample_send_tp);
 			}
 
+			// Turn sampling off
 			m_sample_mode = DEBUG_SAMPLING_OFF;
 		}
 
-		if (motor->m_fault_now != FAULT_CODE_NONE && m_sample_trigger < 0) {
-			m_sample_trigger = m_sample_now;
+		// If the sample trigger index is negative, then the sample window has not
+		// been triggered yet.
+		if (m_sample_trigger < 0) {
+			// Check the conditions which would trigger the beginning of the sample window
+			switch (sample_mode) {
+			case DEBUG_SAMPLING_TRIGGER_START:
+			case DEBUG_SAMPLING_TRIGGER_START_NOSEND: {
+				// Don't trigger until the state switches to running
+				if (state == MC_STATE_RUNNING) {
+					m_sample_trigger = m_sample_now;
+				}
+			} break;
+
+			case DEBUG_SAMPLING_TRIGGER_FAULT:
+			case DEBUG_SAMPLING_TRIGGER_FAULT_NOSEND: {
+				// Don't trigger until a fault code arises
+				if (motor->m_fault_now != FAULT_CODE_NONE) {
+					m_sample_trigger = m_sample_now;
+				}
+			} break;
+
+			default:
+				// We should never be able to get here. Throw an error.
+				break;
+			}
 		}
 	} break;
 
