@@ -1724,14 +1724,24 @@ int mc_interface_try_input(void) {
 	return retval;
 }
 
+
+/**
+ * @brief lock_send_unlock Locks the ISR, sends the event, and unlocks the ISR
+ * @param tp Thread pointer
+ */
+static inline void lock_send_unlock(thread_t *tp) {
+	chSysLockFromISR();
+	chEvtSignalI(tp, (eventmask_t) 1);
+	chSysUnlockFromISR();
+}
+
+
 void mc_interface_fault_stop(mc_fault_code fault, bool is_second_motor, bool is_isr) {
 	m_fault_stop_fault = fault;
 	m_fault_stop_is_second_motor = is_second_motor;
 
 	if (is_isr) {
-		chSysLockFromISR();
-		chEvtSignalI(fault_stop_tp, (eventmask_t) 1);
-		chSysUnlockFromISR();
+		lock_send_unlock(fault_stop_tp);
 	} else {
 		chEvtSignal(fault_stop_tp, (eventmask_t) 1);
 	}
@@ -1905,10 +1915,11 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 	case DEBUG_SAMPLING_NOW:
 		if (m_sample_now == m_sample_len) {
 			m_sample_mode = DEBUG_SAMPLING_OFF;
+			// Save this as the last sample mode
 			m_sample_mode_last = DEBUG_SAMPLING_NOW;
-			chSysLockFromISR();
-			chEvtSignalI(sample_send_tp, (eventmask_t) 1);
-			chSysUnlockFromISR();
+
+			// Send data
+			lock_send_unlock(sample_send_tp);
 		} else {
 			sample = true;
 		}
@@ -1922,9 +1933,8 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		if (m_sample_now == m_sample_len) {
 			m_sample_mode_last = m_sample_mode;
 			m_sample_mode = DEBUG_SAMPLING_OFF;
-			chSysLockFromISR();
-			chEvtSignalI(sample_send_tp, (eventmask_t) 1);
-			chSysUnlockFromISR();
+
+			lock_send_unlock(sample_send_tp);
 		}
 		break;
 
@@ -1975,9 +1985,7 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 			sample = false;
 
 			if (m_sample_mode == DEBUG_SAMPLING_TRIGGER_FAULT) {
-				chSysLockFromISR();
-				chEvtSignalI(sample_send_tp, (eventmask_t) 1);
-				chSysUnlockFromISR();
+				lock_send_unlock(sample_send_tp);
 			}
 
 			m_sample_mode = DEBUG_SAMPLING_OFF;
