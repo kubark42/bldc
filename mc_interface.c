@@ -1907,14 +1907,20 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 	}
 
 	bool sample = false;
+
+	// Turn off sampling if the current motor doesn't correspond to the requested motor
 	debug_sampling_mode sample_mode =
-			m_sample_is_second_motor == is_second_motor ?
+			(m_sample_is_second_motor == is_second_motor) ?
 					m_sample_mode : DEBUG_SAMPLING_OFF;
+
 
 	switch (sample_mode) {
 	case DEBUG_SAMPLING_NOW:
+		// Check if we have reached the requested number of samples
 		if (m_sample_now == m_sample_len) {
+			// Turn sampling off
 			m_sample_mode = DEBUG_SAMPLING_OFF;
+
 			// Save this as the last sample mode
 			m_sample_mode_last = DEBUG_SAMPLING_NOW;
 
@@ -1926,6 +1932,8 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		break;
 
 	case DEBUG_SAMPLING_START:
+		// Wait until the state is running before triggering the
+		// capture. However, once it is running, keep running.
 		if (state == MC_STATE_RUNNING || m_sample_now > 0) {
 			sample = true;
 		}
@@ -2007,6 +2015,7 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		break;
 	}
 
+	// Check if we should save the sample
 	if (sample) {
 		static int a = 0;
 		a++;
