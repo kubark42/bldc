@@ -2601,17 +2601,14 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	motor_now->m_currents_adc[2] = 0.0;
 #endif
 
-	curr0 -= conf_now->foc_offsets_current[0];
-	curr1 -= conf_now->foc_offsets_current[1];
+	ADC_curr_norm_value[0 + norm_curr_ofs] = curr0 - conf_now->foc_offsets_current[0];
+	ADC_curr_norm_value[1 + norm_curr_ofs] = curr1 - conf_now->foc_offsets_current[1];
 #ifdef HW_HAS_3_SHUNTS
-	curr2 -= conf_now->foc_offsets_current[2];
-	motor_now->m_curr_imbalance = curr0 + curr1 + curr2;
-#endif
-
-	ADC_curr_norm_value[0 + norm_curr_ofs] = curr0;
-	ADC_curr_norm_value[1 + norm_curr_ofs] = curr1;
-#ifdef HW_HAS_3_SHUNTS
-	ADC_curr_norm_value[2 + norm_curr_ofs] = curr2;
+	ADC_curr_norm_value[2 + norm_curr_ofs] = curr2 - conf_now->foc_offsets_current[2];
+	// c0 + c1 + c2
+	motor_now->m_curr_imbalance = ADC_curr_norm_value[0 + norm_curr_ofs] +
+	      ADC_curr_norm_value[1 + norm_curr_ofs] +
+	      ADC_curr_norm_value[2 + norm_curr_ofs];
 #else
 	ADC_curr_norm_value[2 + norm_curr_ofs] = -(ADC_curr_norm_value[0] + ADC_curr_norm_value[1]);
 #endif
