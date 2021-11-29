@@ -2949,16 +2949,20 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		// Apply current limits
 		// TODO: Consider D axis current for the input current as well.
-		if (mod_q > 0.001) {
-			utils_truncate_number(&iq_set_tmp, conf_now->lo_in_current_min / mod_q, conf_now->lo_in_current_max / mod_q);
-		} else if (mod_q < -0.001) {
-			utils_truncate_number(&iq_set_tmp, conf_now->lo_in_current_max / mod_q, conf_now->lo_in_current_min / mod_q);
-		}
-
 		if (mod_q > 0.0) {
-			utils_truncate_number(&iq_set_tmp, conf_now->lo_current_min, conf_now->lo_current_max);
+			// Avoid division by 0
+			if (mod_q > 0.001) {
+				utils_truncate_number(&iq_set_tmp, MIN(conf_now->lo_current_min, conf_now->lo_in_current_min / mod_q), MAX(conf_now->lo_current_max, conf_now->lo_in_current_max / mod_q));
+			} else {
+				utils_truncate_number(&iq_set_tmp, conf_now->lo_current_min, conf_now->lo_current_max);
+			}
 		} else {
-			utils_truncate_number(&iq_set_tmp, -conf_now->lo_current_max, -conf_now->lo_current_min);
+			// Avoid division by 0
+			if (mod_q < -0.001) {
+				utils_truncate_number(&iq_set_tmp, MIN(-conf_now->lo_current_max, conf_now->lo_in_current_max / mod_q), MAX(-conf_now->lo_current_min, conf_now->lo_in_current_min / mod_q));
+			} else {
+				utils_truncate_number(&iq_set_tmp, -conf_now->lo_current_max, -conf_now->lo_current_min);
+			}
 		}
 
 		// Bound id and iq
