@@ -1907,7 +1907,7 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 		}
 	}
 
-	process_trace_sampling(state, motor, conf_now, current, f_samp, is_second_motor);
+	process_trace_sampling(state, (motor_if_state_t *)motor, (mc_configuration *)conf_now, current, f_samp, is_second_motor);
 }
 
 void process_trace_sampling(mc_state state, motor_if_state_t *motor, mc_configuration *conf_now, float current, float f_samp, bool is_second_motor) {
