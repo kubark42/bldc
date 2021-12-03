@@ -2723,6 +2723,12 @@ static THD_FUNCTION(sample_send_thread, arg) {
 
 			// Offset the index to allow for `m_sample_len` samples before the triggering event
 			ind_samp = m_sample_trigger - m_sample_len;
+
+         // Wrap to positive value
+         while (ind_samp < 0) {
+            ind_samp += ADC_SAMPLE_MAX_LEN;
+         }
+
 			break;
 
 		case DEBUG_SAMPLING_OFF:
