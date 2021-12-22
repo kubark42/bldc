@@ -7,7 +7,7 @@ ROOT_DIR := $(realpath $(WHEREAMI)/ )
 TARGET_PATHS := $(wildcard $(ROOT_DIR)/hwconf/hw_*.h)
 
 # Strip the paths down to just the names. Do this by first removing the prefix (PATH/hw_), and then the suffic (.h)
-TARGET_NAMES := $(subst .h,,$(subst $(ROOT_DIR)/hwconf/hw_,,$(TARGET_PATHS)))
+ALL_BOARD_NAMES := $(subst .h,,$(subst $(ROOT_DIR)/hwconf/hw_,,$(TARGET_PATHS)))
 
 # configure some directories that are relative to wherever ROOT_DIR is located
 TOOLS_DIR := $(ROOT_DIR)/tools
@@ -76,6 +76,7 @@ help:
 	@echo
 	@echo "   [Tool Installers]"
 	@echo "     arm_sdk_install      - Install the GNU ARM gcc toolchain"
+	@echo "     qt_sdk_install       - Install the Qt SDK"
 	@echo
 	@echo "   [Big Hammer]"
 	@echo "     all_fw               - Build firmware for all boards"
@@ -87,7 +88,7 @@ help:
 	@echo
 	@echo "   [Firmware]"
 	@echo "     fw   - Build firmware for default target"
-	@echo "                            supported boards are: $(TARGET_NAMES)"
+	@echo "                            supported boards are: $(ALL_BOARD_NAMES)"
 	@echo "     fw_<board>   - Build firmware for target <board>"
 	@echo "     PROJECT=<target> fw   - Build firmware for <target>"
 	@echo "     fw_<board>_clean     - Remove firmware for <board>"
@@ -166,14 +167,14 @@ size: build/$(PROJECT).elf
 	@$(SZ) $<
 
 # Generate the targets for whatever boards are in each list
-FW_TARGETS := $(addprefix fw_, $(TARGET_NAMES))
+FW_TARGETS := $(addprefix fw_, $(ALL_BOARD_NAMES))
 
 .PHONY: all_fw all_fw_clean
 all_fw:        $(addsuffix _vescfw, $(FW_TARGETS))
 all_fw_clean:  $(addsuffix _clean,  $(FW_TARGETS))
 
 # Expand the firmware rules
-$(foreach board, $(TARGET_NAMES), $(eval $(call FW_TEMPLATE,$(board))))
+$(foreach board, $(ALL_BOARD_NAMES), $(eval $(call FW_TEMPLATE,$(board))))
 
 
 ##############################
