@@ -2716,7 +2716,7 @@ static THD_FUNCTION(sample_send_thread, arg) {
 		}
 
 		for (int i = 0;i < len;i++) {
-			uint8_t buffer[39];  // 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1
+			uint8_t buffer[40];  // 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 1
 			int32_t index = 0;
 			int ind_samp = i + offset;
 
@@ -2752,6 +2752,9 @@ static THD_FUNCTION(sample_send_thread, arg) {
 			buffer_append_float32_auto(buffer, (float)m_frf_samples_mV[ind_samp], &index);
 			buffer[index++] = m_status_samples[ind_samp];
 			buffer[index++] = m_phase_samples[ind_samp];
+
+			static uint8_t sequence_number = 0;
+			buffer[index++] = sequence_number++;
 
 			commands_send_packet(buffer, index);
 		}
