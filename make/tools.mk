@@ -51,6 +51,135 @@ else
 endif
 
 
+##########
+# Qt SDK #
+##########
+QT_ROOT := $(TOOLS_DIR)/Qt
+QT_SDK_VER := 5.15.2
+QT_SDK_DIR := $(QT_ROOT)/$(QT_SDK_VER)
+
+ifdef LINUX
+  QT_SDK_ARCH  := gcc_64
+  QT_SDK_HOST  := linux
+  QT_BIN       := $(QT_SDK_DIR)/$(QT_SDK_ARCH)/bin
+  QT_SDKTOOL   := $(QT_ROOT)/Tools/QtCreator/libexec/qtcreator/sdktool
+  QMAKE        := qmake
+endif
+
+ifdef MACOS
+  QT_SDK_ARCH  := clang_64
+  QT_SDK_HOST  := mac
+  QT_BIN       := $(QT_SDK_DIR)/$(QT_SDK_ARCH)/bin
+  QT_SDKTOOL  := $(TOOLS_DIR)/Qt/Qt\ Creator.app/Contents/Resources/libexec/sdktool
+  QMAKE       := qmake
+endif
+
+ifdef WINDOWS
+  QT_SDK_ARCH  := win64_msvc2019_64
+  QT_SDK_HOST  := windows
+  QT_BIN       := $(QT_SDK_DIR)/msvc2019_64/bin
+  QT_SDKTOOL  := $(QT_ROOT)\Tools\QtCreator\bin\sdktool.exe
+  QMAKE       := qmake.exe
+endif
+
+.PHONY: qt_sdk_install
+
+qt_sdk_install: QT_SDK_FILE := $(notdir $(QT_SDK_URL))
+# order-only prereq on directory existance:
+qt_sdk_install: | $(DL_DIR) $(TOOLS_DIR)
+qt_sdk_install: qt_sdk_clean
+# binary only release so just download and extract it
+	$(V1) aqt install-qt --keep --archive-dest "$(DL_DIR)/Qt" $(QT_SDK_HOST) desktop $(QT_SDK_VER) $(QT_SDK_ARCH) --outputdir $(QT_ROOT)
+
+.PHONY: qt_sdk_clean
+qt_sdk_clean:
+ifneq ($(OSFAMILY), windows)
+	$(V1) [ ! -d "$(QT_SDK_DIR)" ] || $(RM) -r $(QT_SDK_DIR)
+else
+	$(V1) pwsh -noprofile -command if (Test-Path $(QT_SDK_DIR)) {Remove-Item -Recurse $(QT_SDK_DIR)}
+endif
+
+
+#################
+# linuxdeployqt #
+#################
+
+.PHONY: qt_linuxdeployqt_install
+ifdef LINUX
+qt_linuxdeployqt_install: LINUXDEPLOYQT_URL  := https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+qt_linuxdeployqt_install: LINUXDEPLOYQT_FILE := linuxdeployqt-continuous-x86_64.AppImage
+qt_linuxdeployqt_install:
+	# download the source only if it's newer than what we already have
+	$(V1) wget --no-check-certificate -N -P "$(DL_DIR)" "$(LINUXDEPLOYQT_URL)"
+
+	# Set the file to executable
+	$(V1) chmod +x "$(DL_DIR)/$(LINUXDEPLOYQT_FILE)"
+
+	# Extract the file contents
+	$(V1) "$(DL_DIR)/$(LINUXDEPLOYQT_FILE)" --appimage-extract
+endif
+
+
+
+##############
+# Qt Creator #
+##############
+QT_CREATOR_DIR := $(TOOLS_DIR)/Qt
+
+.PHONY: qt_creator_install
+ifdef LINUX
+  qt_creator_install: QT_CREATOR_HOST  := linux
+endif
+
+ifdef MACOS
+  qt_creator_install: QT_CREATOR_HOST  := mac
+endif
+
+ifdef WINDOWS
+  qt_creator_install: QT_CREATOR_HOST  := windows
+endif
+
+qt_creator_install:
+# binary only release so just download and extract it
+	$(V1) aqt install-tool --keep --archive-dest "$(DL_DIR)/Qt" $(QT_CREATOR_HOST) desktop tools_qtcreator qt.tools.qtcreator --outputdir $(QT_CREATOR_DIR)
+
+.PHONY: qt_creator_configure
+qt_creator_configure:
+# Create a shared Qt project file with all the targets
+	$(V1) $(PYTHON) Project/scripts/qt_creator_firmware_configuration.py --targets $(ALL_BOARD_NAMES) sim_posix
+	$(V1) $(QT_SDKTOOL) addQt \
+	  --id qt.vesc \
+	  --name "VESC Firmware" \
+	  --qmake $(QT_BIN)/$(QMAKE) \
+	  --type Qt4ProjectManager.QtVersion.Desktop
+	$(V1) $(QT_SDKTOOL) addKit \
+	    --id qt.vesc \
+	    --name "VESC Firmware" \
+	    --devicetype Desktop \
+	    --qt qt.vesc
+
+.PHONY: qt_creator_uninstall
+qt_creator_uninstall:
+	$(V1) $(QT_SDKTOOL) rmQt --id qt.vesc
+	$(V1) $(QT_SDKTOOL) rmKit --id qt.vesc
+
+.PHONY: qt_creator_clean
+qt_creator_clean: qt_creator_uninstall
+ifneq ($(OSFAMILY), windows)
+	$(V1) [ ! -d "$(QT_CREATOR_DIR)" ] || $(RM) -r $(QT_CREATOR_DIR)
+else
+	$(V1) pwsh -noprofile -command if (Test-Path $(QT_CREATOR_DIR)) {Remove-Item -Recurse $(QT_CREATOR_DIR)}
+endif
+
+
+##########
+# All Qt #
+##########
+
+
+.PHONY: qt_install
+qt_install: qt_sdk_install qt_creator_install qt_creator_configure qt_linuxdeployqt_install
+
 ###############
 # Google Test #
 ###############
