@@ -580,4 +580,15 @@
 #define MCCONF_BMS_FWD_CAN_MODE			BMS_FWD_CAN_MODE_DISABLED
 #endif
 
+// UI color
+#ifndef MCCONF_MOTOR_COLOR_RED
+#define MCCONF_MOTOR_COLOR_RED       0
+#endif
+#ifndef MCCONF_MOTOR_COLOR_GREEN
+#define MCCONF_MOTOR_COLOR_GREEN     0
+#endif
+#ifndef MCCONF_MOTOR_COLOR_BLUE
+#define MCCONF_MOTOR_COLOR_BLUE      0
+#endif
+
 #endif /* MCCONF_DEFAULT_H_ */

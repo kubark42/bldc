@@ -509,6 +509,11 @@ typedef struct {
 	// BMS Configuration
 	bms_config bms;
 
+	// UI color
+	uint8_t motor_color_red;
+	uint8_t motor_color_green;
+	uint8_t motor_color_blue;
+
 	// Protect from flash corruption.
 	uint16_t crc;
 } mc_configuration;

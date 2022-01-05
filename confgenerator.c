@@ -187,6 +187,9 @@ int32_t confgenerator_serialize_mcconf(uint8_t *buffer, const mc_configuration *
 	buffer_append_float16(buffer, conf->bms.soc_limit_start, 1000, &ind);
 	buffer_append_float16(buffer, conf->bms.soc_limit_end, 1000, &ind);
 	buffer[ind++] = conf->bms.fwd_can_mode;
+	buffer[ind++] = (uint8_t)conf->motor_color_red;
+	buffer[ind++] = (uint8_t)conf->motor_color_green;
+	buffer[ind++] = (uint8_t)conf->motor_color_blue;
 
 	return ind;
 }
@@ -559,6 +562,9 @@ bool confgenerator_deserialize_mcconf(const uint8_t *buffer, mc_configuration *c
 	conf->bms.soc_limit_start = buffer_get_float16(buffer, 1000, &ind);
 	conf->bms.soc_limit_end = buffer_get_float16(buffer, 1000, &ind);
 	conf->bms.fwd_can_mode = buffer[ind++];
+	conf->motor_color_red = buffer[ind++];
+	conf->motor_color_green = buffer[ind++];
+	conf->motor_color_blue = buffer[ind++];
 
 	return true;
 }
@@ -927,6 +933,9 @@ void confgenerator_set_defaults_mcconf(mc_configuration *conf) {
 	conf->bms.soc_limit_start = MCCONF_BMS_SOC_LIMIT_START;
 	conf->bms.soc_limit_end = MCCONF_BMS_SOC_LIMIT_END;
 	conf->bms.fwd_can_mode = MCCONF_BMS_FWD_CAN_MODE;
+	conf->motor_color_red = MCCONF_MOTOR_COLOR_RED;
+	conf->motor_color_green = MCCONF_MOTOR_COLOR_GREEN;
+	conf->motor_color_blue = MCCONF_MOTOR_COLOR_BLUE;
 }
 
 void confgenerator_set_defaults_appconf(app_configuration *conf) {
