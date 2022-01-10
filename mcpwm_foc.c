@@ -3779,8 +3779,8 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 	UTILS_NAN_ZERO(*x2);
 
 	// Prevent the magnitude from getting too low, as that makes the angle very unstable.
-	float mag = sqrtf(SQ(*x1) + SQ(*x2));
-	if (mag < (conf_now->foc_motor_flux_linkage * 0.5)) {
+	float mag2 = (SQ(*x1) + SQ(*x2));
+	if (mag2 < 0.25 * SQ(conf_now->foc_motor_flux_linkage)) {
 		*x1 *= 1.1;
 		*x2 *= 1.1;
 	}
