@@ -3780,8 +3780,6 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 		break;
 	}
 
-	UTILS_NAN_ZERO(*x1);
-	UTILS_NAN_ZERO(*x2);
 
 	// Prevent the magnitude from getting too low, as that makes the angle very unstable.
 	float mag2 = (SQ(*x1) + SQ(*x2));
