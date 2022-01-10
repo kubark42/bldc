@@ -3748,12 +3748,15 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 	const float L_ib = L * i_beta;
 	const float R_ia = R * i_alpha;
 	const float R_ib = R * i_beta;
-	const float lambda_2 = SQ(lambda);
-	const float gamma_half = motor->m_gamma_now * 0.5;
 
 	switch (conf_now->foc_observer_type) {
 	case FOC_OBSERVER_ORTEGA_ORIGINAL: {
-		float err = lambda_2 - (SQ(*x1 - L_ia) + SQ(*x2 - L_ib));
+		const float lambda_2 = SQ(lambda);
+		const float gamma_half = motor->m_gamma_now * 0.5;
+		const float x1Lia = *x1 - L_ia;
+		const float x2Lib = *x2 - L_ib;
+
+		float err = lambda_2 - (SQ(x1Lia) + SQ(x2Lib));
 
 		// Forcing this term to stay negative helps convergence according to
 		//
@@ -3764,8 +3767,10 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 			err = 0.0;
 		}
 
-		float x1_dot = v_alpha - R_ia + gamma_half * (*x1 - L_ia) * err;
-		float x2_dot = v_beta - R_ib + gamma_half * (*x2 - L_ib) * err;
+		float tmp1 = gamma_half * err;
+
+		float x1_dot = v_alpha - R_ia + tmp1 * (x1Lia);
+		float x2_dot = v_beta  - R_ib + tmp1 * (x2Lib);
 
 		*x1 += x1_dot * dt;
 		*x2 += x2_dot * dt;
