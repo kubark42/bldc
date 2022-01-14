@@ -86,9 +86,27 @@ void terminal_process_string(char *str) {
 		mc_interface_set_duty(0);
 		commands_printf("Motor stopped\n");
 	} else if (strcmp(argv[0], "last_adc_duration") == 0) {
-		commands_printf("Latest ADC duration: %.4f ms", (double)(mcpwm_get_last_adc_isr_duration() * 1000.0));
-		commands_printf("Latest injected ADC duration: %.4f ms", (double)(mc_interface_get_last_inj_adc_isr_duration() * 1000.0));
-		commands_printf("Latest sample ADC duration: %.4f ms\n", (double)(mc_interface_get_last_sample_adc_isr_duration() * 1000.0));
+//		commands_printf("Latest ADC duration: %.4f ms", (double)(mcpwm_get_last_adc_isr_duration() * 1000.0));
+//      commands_printf("Latest injected ADC duration: %.4f ms", (double)(mc_interface_get_last_inj_adc_isr_duration_sec() * 1000.0));
+      uint32_t *bob = mc_interface_get_last_inj_adc_isr_duration_ticks();
+      double fred = mc_interface_get_last_inj_adc_isr_duration_sec() * 1000.0;
+
+      uint32_t start = bob[0];
+      uint32_t t1 = bob[1] - start;
+      uint32_t t2 = bob[2] - start;
+      uint32_t t3 = bob[3] - start;
+      uint32_t t4 = bob[4] - start;
+      uint32_t t5 = bob[5] - start;
+      uint32_t t6 = bob[6] - start;
+      uint32_t t7 = bob[7] - start;
+      uint32_t t8 = bob[8] - start;
+      uint32_t t9 = bob[9] - start;
+
+      uint32_t end = bob[10] - start;
+      commands_printf("Injected ADC: ticks: t1: %d, t2: %d, t2-t1: %d, t3: %d, t4: %d, t5: %d, t6: %d, t7: %d, t8: %d, t9: %d, end: %d", t1, t2, t2-t1, t3, t4, t5, t6, t7, t8, t9, end);
+
+//      commands_printf("Latest injected ADC: ticks: %d, time: %.4f ms, ratio: %f", end, fred, end/(fred*(double)1.0e3));
+//		commands_printf("Latest sample ADC duration: %.1f ms\n", (double)(mc_interface_get_last_sample_adc_isr_duration() * 1000.0));
 	} else if (strcmp(argv[0], "kv") == 0) {
 		commands_printf("Calculated KV: %.2f rpm/volt\n", (double)mcpwm_get_kv_filtered());
 	} else if (strcmp(argv[0], "mem") == 0) {

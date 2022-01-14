@@ -105,6 +105,9 @@ static THD_FUNCTION(led_thread, arg) {
 
 	chRegSetThreadName("Main LED");
 
+   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk; // enable counter
+
 	for(;;) {
 		mc_state state1 = mc_interface_get_state();
 		mc_interface_select_motor_thread(2);
@@ -120,8 +123,10 @@ static THD_FUNCTION(led_thread, arg) {
 		mc_interface_select_motor_thread(2);
 		mc_fault_code fault2 = mc_interface_get_fault();
 		mc_interface_select_motor_thread(1);
+
+      // Check if there are any faults present
 		if (fault != FAULT_CODE_NONE || fault2 != FAULT_CODE_NONE) {
-			for (int i = 0;i < (int)fault;i++) {
+			for (int i = 0; i < (int)fault; i++) {
 				ledpwm_set_intensity(LED_RED, 1.0);
 				chThdSleepMilliseconds(250);
 				ledpwm_set_intensity(LED_RED, 0.0);
@@ -130,7 +135,7 @@ static THD_FUNCTION(led_thread, arg) {
 
 			chThdSleepMilliseconds(500);
 
-			for (int i = 0;i < (int)fault2;i++) {
+			for (int i = 0; i < (int)fault2; i++) {
 				ledpwm_set_intensity(LED_RED, 1.0);
 				chThdSleepMilliseconds(250);
 				ledpwm_set_intensity(LED_RED, 0.0);

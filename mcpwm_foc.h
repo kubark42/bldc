@@ -82,7 +82,8 @@ bool mcpwm_foc_measure_res_ind(float *res, float *ind, float *ld_lq_diff);
 bool mcpwm_foc_hall_detect(float current, uint8_t *hall_table);
 int mcpwm_foc_dc_cal(bool cal_undriven);
 void mcpwm_foc_print_state(void);
-float mcpwm_foc_get_last_adc_isr_duration(void);
+float mcpwm_foc_get_last_adc_isr_duration_sec(void);
+uint32_t *mcpwm_foc_get_last_adc_isr_duration_ticks(void);
 void mcpwm_foc_get_current_offsets(
 		volatile float *curr0_offset,
 		volatile float *curr1_offset,

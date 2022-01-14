@@ -17,6 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -196,7 +200,9 @@ typedef struct {
 
 // Private variables
 static volatile bool m_dccal_done = false;
-static volatile float m_last_adc_isr_duration;
+static volatile float m_last_adc_isr_duration_sec;
+#define NUM_PROFILER_POINTS 11
+static volatile uint32_t m_last_adc_isr_duration_ticks[NUM_PROFILER_POINTS];
 static volatile bool m_init_done = false;
 static volatile motor_all_state_t m_motor_1;
 #ifdef HW_HAS_DUAL_MOTORS
@@ -931,7 +937,7 @@ void mcpwm_foc_set_current(float current) {
 	motor_now()->m_control_mode = CONTROL_MODE_CURRENT;
 	motor_now()->m_iq_set = current;
 	motor_now()->m_id_set = 0;
-	
+
 	if (fabsf(current) < motor_now()->m_conf->cc_min_current) {
 		return;
 	}
@@ -2453,8 +2459,12 @@ void mcpwm_foc_print_state(void) {
 	commands_printf("off_delay: %.2f", (double)motor_now()->m_current_off_delay);
 }
 
-float mcpwm_foc_get_last_adc_isr_duration(void) {
-	return m_last_adc_isr_duration;
+float mcpwm_foc_get_last_adc_isr_duration_sec(void) {
+	return m_last_adc_isr_duration_sec;
+}
+
+uint32_t *mcpwm_foc_get_last_adc_isr_duration_ticks(void) {
+	return (uint32_t *)m_last_adc_isr_duration_ticks;
 }
 
 void mcpwm_foc_tim_sample_int_handler(void) {
@@ -2470,6 +2480,10 @@ void mcpwm_foc_tim_sample_int_handler(void) {
 }
 
 void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
+   volatile uint32_t t_start = timer_time_now();
+   volatile uint32_t tmp_ticks[NUM_PROFILER_POINTS];
+   tmp_ticks[0] = DWT->CYCCNT;
+
 	(void)p;
 	(void)flags;
 
@@ -2480,7 +2494,6 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		return;
 	}
 
-	uint32_t t_start = timer_time_now();
 
 	bool is_v7 = !(TIM1->CR1 & TIM_CR1_DIR);
 	int norm_curr_ofs = 0;
@@ -2504,6 +2517,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 #endif
 
 	volatile mc_configuration *conf_now = motor_now->m_conf;
+
+   // [TICKS] Always 28 counts to here
 
 	if (motor_other->m_duty_next_set) {
 		motor_other->m_duty_next_set = false;
@@ -2535,6 +2550,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 	// Reset the watchdog
 	timeout_feed_WDT(THREAD_MCPWM);
+
+   // [TICKS] Always 79 counts to here
 
 #ifdef AD2S1205_SAMPLE_GPIO
 	// force a position sample in the AD2S1205 resolver IC (falling edge)
@@ -2586,6 +2603,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	curr2 -= conf_now->foc_offsets_current[2];
 	motor_now->m_curr_unbalance = curr0 + curr1 + curr2;
 #endif
+
+   // [TICKS] Always 110 counts to here
 
 	ADC_curr_norm_value[0 + norm_curr_ofs] = curr0;
 	ADC_curr_norm_value[1 + norm_curr_ofs] = curr1;
@@ -2660,6 +2679,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	}
 #endif
 
+   // [TICKS] Always 129 counts to here
+
 	float ia = ADC_curr_norm_value[0 + norm_curr_ofs] * FAC_CURRENT;
 	float ib = ADC_curr_norm_value[1 + norm_curr_ofs] * FAC_CURRENT;
 //	float ic = -(ia + ib);
@@ -2669,10 +2690,10 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	if (conf_now->foc_sample_v0_v7) {
 		dt = 1.0 / conf_now->foc_f_zv;
 	} else {
-		dt = 1.0 / (conf_now->foc_f_zv / 2.0);
+		dt = 2.0 / (conf_now->foc_f_zv );
 	}
 #else
-	float dt = 1.0 / (conf_now->foc_f_zv / 2.0);
+	float dt = 2.0 / (conf_now->foc_f_zv);
 #endif
 
 	// This has to be done for the skip function to have any chance at working with the
@@ -2697,6 +2718,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		}
 	}
 
+   // [TICKS] Always 234 counts to here
+
 	if (encoder_is_being_used) {
 		float phase_tmp = enc_ang;
 		if (conf_now->foc_encoder_inverted) {
@@ -2709,6 +2732,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	}
 
 	if (motor_now->m_state == MC_STATE_RUNNING) {
+      // [TICKS] Always 248 ticks to get here
+
 		// Clarke transform assuming balanced currents
 		motor_now->m_motor_state.i_alpha = ia;
 		motor_now->m_motor_state.i_beta = ONE_BY_SQRT3 * ia + TWO_BY_SQRT3 * ib;
@@ -2731,6 +2756,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 
 		UTILS_LP_FAST(motor_now->m_duty_filtered, duty_now, 0.01);
 		utils_truncate_number_abs((float*)&motor_now->m_duty_filtered, 1.0);
+
+      // [TICKS] Always 364 ticks to get here
 
 		float duty_set = motor_now->m_duty_cycle_set;
 		bool control_duty = motor_now->m_control_mode == CONTROL_MODE_DUTY ||
@@ -2759,6 +2786,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			motor_now->m_br_no_duty_samples = 0;
 		}
 
+      // [TICKS] Always 393 ticks to get here
+
 		motor_now->m_br_speed_before = speed_fast_now;
 		motor_now->m_br_vq_before = vq_now;
 
@@ -2779,6 +2808,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			}
 		}
 		motor_now->m_was_control_duty = control_duty;
+
+      // [TICKS] Always 421 ticks to get here
 
 		if (!control_duty) {
 			motor_now->m_duty_i_term = motor_now->m_motor_state.iq / conf_now->lo_current_max;
@@ -2823,18 +2854,27 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			iq_set_tmp = -SIGN(speed_fast_now) * fabsf(iq_set_tmp);
 		}
 
+      // [TICKS] Always ~447 ticks to get here
+
 		// Set motor phase
 		{
+
 			if (!motor_now->m_phase_override) {
+            tmp_ticks[1] = DWT->CYCCNT;
+
+             // This section takes around 450 ticks
 				observer_update(motor_now->m_motor_state.v_alpha, motor_now->m_motor_state.v_beta,
 						motor_now->m_motor_state.i_alpha, motor_now->m_motor_state.i_beta, dt,
 						&motor_now->m_observer_x1, &motor_now->m_observer_x2, &motor_now->m_phase_now_observer, motor_now);
 
+            tmp_ticks[2] = DWT->CYCCNT;
 				// Compensate from the phase lag caused by the switching frequency. This is important for motors
 				// that run on high ERPM compared to the switching frequency.
 				motor_now->m_phase_now_observer += motor_now->m_pll_speed * dt * (0.5 + conf_now->foc_observer_offset);
 				utils_norm_angle_rad((float*)&motor_now->m_phase_now_observer);
 			}
+
+         // [TICKS] Always ~960 ticks to get here
 
 			switch (conf_now->foc_sensor_mode) {
 			case FOC_SENSOR_MODE_ENCODER:
@@ -2917,6 +2957,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				break;
 			}
 
+         // [TICKS] Always ~1045 ticks to get here
+
 			if (motor_now->m_control_mode == CONTROL_MODE_HANDBRAKE) {
 				// Force the phase to 0 in handbrake mode so that the current simply locks the rotor.
 				motor_now->m_motor_state.phase = 0.0;
@@ -2934,10 +2976,17 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 				motor_now->m_motor_state.phase = motor_now->m_phase_now_override;
 			}
 
+         tmp_ticks[3] = DWT->CYCCNT;
+
 			utils_fast_sincos_better(motor_now->m_motor_state.phase,
 					(float*)&motor_now->m_motor_state.phase_sin,
 					(float*)&motor_now->m_motor_state.phase_cos);
+
+
 		}
+
+      // [TICKS] Always 1225 ticks to get here
+      tmp_ticks[4] = DWT->CYCCNT;
 
 		// Apply MTPA. See: https://github.com/vedderb/bldc/pull/179
 		const float ld_lq_diff = conf_now->foc_motor_ld_lq_diff;
@@ -2952,6 +3001,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			id_set_tmp = (lambda - sqrtf(SQ(lambda) + 8.0 * SQ(ld_lq_diff) * SQ(iq_ref))) / (4.0 * ld_lq_diff);
 			iq_set_tmp = SIGN(iq_set_tmp) * sqrtf(SQ(iq_set_tmp) - SQ(id_set_tmp));
 		}
+
+
+      // [TICKS] Always 1249-1250 ticks to get here
 
 		const float mod_q = motor_now->m_motor_state.mod_q_filter;
 
@@ -2968,6 +3020,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 			utils_truncate_number(&iq_set_tmp, conf_now->lo_in_current_max / mod_q, conf_now->lo_in_current_min / mod_q);
 		}
 
+      // [TICKS] Always ~1350 ticks to get here
+
 		if (mod_q > 0.0) {
 			utils_truncate_number(&iq_set_tmp, conf_now->lo_current_min, conf_now->lo_current_max);
 		} else {
@@ -2981,8 +3035,17 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		motor_now->m_motor_state.id_target = id_set_tmp;
 		motor_now->m_motor_state.iq_target = iq_set_tmp;
 
+      // [TICKS] ~1500 ticks to get here
+      tmp_ticks[5] = DWT->CYCCNT;
+
 		control_current(motor_now, dt);
 	} else {
+      tmp_ticks[1] = DWT->CYCCNT;
+      tmp_ticks[2] = DWT->CYCCNT;
+      tmp_ticks[3] = DWT->CYCCNT;
+      tmp_ticks[4] = DWT->CYCCNT;
+      tmp_ticks[5] = DWT->CYCCNT;
+
 		// Motor is not running
 
 		// The current is 0 when the motor is undriven
@@ -3095,6 +3158,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		utils_truncate_number_abs((float*)&motor_now->m_motor_state.mod_q_filter, 1.0);
 	}
 
+   tmp_ticks[6] = DWT->CYCCNT;
+
 	// Calculate duty cycle
 	motor_now->m_motor_state.duty_now = SIGN(motor_now->m_motor_state.vq) *
 			sqrtf(SQ(motor_now->m_motor_state.mod_d) + SQ(motor_now->m_motor_state.mod_q)) / SQRT3_BY_2;
@@ -3102,6 +3167,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	// Run PLL for speed estimation
 	pll_run(motor_now->m_motor_state.phase, dt, &motor_now->m_pll_phase, &motor_now->m_pll_speed, conf_now);
 	motor_now->m_motor_state.speed_rad_s = motor_now->m_pll_speed;
+
+   tmp_ticks[7] = DWT->CYCCNT;
 
 	// Low latency speed estimation, for e.g. HFI.
 	{
@@ -3134,6 +3201,9 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		diff += 6;
 	}
 
+
+   tmp_ticks[8] = DWT->CYCCNT;
+
 	motor_now->m_tachometer += diff;
 	motor_now->m_tachometer_abs += abs(diff);
 
@@ -3150,6 +3220,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 	}
 
 	utils_norm_angle(&angle_now);
+
 
 	if (conf_now->p_pid_ang_div > 0.98 && conf_now->p_pid_ang_div < 1.02) {
 		motor_now->m_pos_pid_now = angle_now;
@@ -3168,19 +3239,24 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		utils_norm_angle((float*)&motor_now->m_pos_pid_now);
 	}
 
+
 #ifdef AD2S1205_SAMPLE_GPIO
 	// Release sample in the AD2S1205 resolver IC.
 	palSetPad(AD2S1205_SAMPLE_GPIO, AD2S1205_SAMPLE_PIN);
 #endif
+   tmp_ticks[9] = DWT->CYCCNT;
 
 #ifdef HW_HAS_DUAL_MOTORS
 	mc_interface_mc_timer_isr(is_second_motor);
 #else
-	mc_interface_mc_timer_isr(false);
+	mc_interface_mc_timer_isr(false);  // This takes around 670 cycles
 #endif
+   tmp_ticks[10] = DWT->CYCCNT;
 
 	m_isr_motor = 0;
-	m_last_adc_isr_duration = timer_seconds_elapsed_since(t_start);
+   m_last_adc_isr_duration_sec = timer_seconds_elapsed_since(t_start);
+
+   memcpy((char *)m_last_adc_isr_duration_ticks, (char *)tmp_ticks, sizeof(m_last_adc_isr_duration_ticks));
 }
 
 // Private functions
@@ -3714,7 +3790,8 @@ static THD_FUNCTION(pid_thread, arg) {
 	}
 }
 
-// See http://cas.ensmp.fr/~praly/Telechargement/Journaux/2010-IEEE_TPEL-Lee-Hong-Nam-Ortega-Praly-Astolfi.pdf
+
+// See http://cas.ensmp.fr/~praly/Telechargement/Journaux/2010-IEEE_TPEL-Lee-Hong-Nam--Praly-Astolfi.pdf
 void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 					 float dt, volatile float *x1, volatile float *x2, volatile float *phase, volatile motor_all_state_t *motor) {
 
@@ -3741,7 +3818,7 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 
 	// Adjust inductance for saliency.
 	if (fabsf(id) > 0.1 || fabsf(iq) > 0.1) {
-		L = L - ld_lq_diff / 2.0 + ld_lq_diff * SQ(iq) / (SQ(id) + SQ(iq));
+		L = L - (0.5*ld_lq_diff) + ld_lq_diff * SQ(iq) / (SQ(id) + SQ(iq));
 	}
 
 	const float L_ia = L * i_alpha;
@@ -3772,18 +3849,116 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 		float x1_dot = v_alpha - R_ia + tmp1 * (x1Lia);
 		float x2_dot = v_beta  - R_ib + tmp1 * (x2Lib);
 
+      float old_x1 = *x1;
+      float old_x2 = *x2;
+
 		*x1 += x1_dot * dt;
 		*x2 += x2_dot * dt;
+
+
+      struct Bob {
+         float old_x1;
+         float old_x2;
+         float x1;
+         float x2;
+         float x1_dot;
+         float x2_dot;
+
+         float L;
+         float R;
+
+         float ia;
+         float ib;
+
+         float va;
+         float vb;
+
+         float R_ia;
+         float R_ib;
+         float L_ia;
+         float L_ib;
+
+         float lambda;
+         float lambda_2;
+
+         float gamma_half;
+         float foc_motor_flux_linkage;
+
+         float ld_lq_diff;
+         float id;
+         float iq;
+
+         float dt;
+         float err;
+      };
+
+      volatile struct Bob bob;
+
+      bob.old_x1 = old_x1;
+      bob.old_x2 = old_x2;
+      bob.x1 = *x1;
+      bob.x2 = *x2;
+      bob.x1_dot = x1_dot;
+      bob.x2_dot = x2_dot;
+
+      bob.foc_motor_flux_linkage = conf_now->foc_motor_flux_linkage;
+
+      bob.L = L;
+      bob.R = R;
+
+      bob.ia = i_alpha;
+      bob.ib = i_beta;
+
+      bob.L_ia = L_ia;
+      bob.L_ib = L_ib;
+
+      bob.lambda = lambda;
+      bob.lambda_2 = lambda_2;
+
+      bob.ld_lq_diff = ld_lq_diff;
+      bob.id = id;
+      bob.iq = iq;
+
+      bob.gamma_half = gamma_half;
+
+      bob.va = v_alpha;
+      bob.vb = v_beta;
+      bob.R_ia = R_ia;
+      bob.R_ib = R_ib;
+      bob.dt = dt;
+      bob.err = err;
+
+      // Check This system satisfies the global stability requirement,
+      // norm(x) < 2*flux_linkage
+      if (SQ(*x1) + SQ(*x2) > 4*SQ(conf_now->foc_motor_flux_linkage)) {
+         ITM_SendChar(&bob);
+      }
+
+      if ((UTILS_IS_NAN(*x1) || UTILS_IS_NAN(*x2) ) ||
+          (fpclassify(*x1) == FP_INFINITE ||
+           fpclassify(*x2) == FP_INFINITE)) {
+
+            UTILS_NAN_ZERO(*x1);
+            UTILS_NAN_ZERO(*x2);
+
+            ITM_SendChar(&bob);
+      }
+
 	} break;
 
 	default:
+      // This should probably throw an assert
 		break;
 	}
 
 
+//   // These two checks take 20 cycles
+//	UTILS_NAN_ZERO(*x1);
+//	UTILS_NAN_ZERO(*x2);
+
 	// Prevent the magnitude from getting too low, as that makes the angle very unstable.
 	float mag2 = (SQ(*x1) + SQ(*x2));
-	if (mag2 < 0.25 * SQ(conf_now->foc_motor_flux_linkage)) {
+	if (mag2 < 0.25 * SQ(conf_now->foc_motor_flux_linkage)) {  // This is a semi-constant value
 		*x1 *= 1.1;
 		*x2 *= 1.1;
 	}
@@ -3792,6 +3967,7 @@ void observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 		*phase = utils_fast_atan2(*x2 - L_ib, *x1 - L_ia);
 	}
 }
+
 
 static void pll_run(float phase, float dt, volatile float *phase_var,
 					volatile float *speed_var, volatile mc_configuration *conf) {
@@ -3870,7 +4046,7 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	float max_duty = fabsf(state_m->max_duty);
 	utils_truncate_number(&max_duty, 0.0, conf_now->l_max_duty);
 
-    // Park transform: transforms the currents from stator to the rotor reference frame  
+    // Park transform: transforms the currents from stator to the rotor reference frame
 	state_m->id = c * state_m->i_alpha + s * state_m->i_beta;
 	state_m->iq = c * state_m->i_beta  - s * state_m->i_alpha;
 
@@ -4009,7 +4185,7 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
     state_m->i_abs = sqrtf(SQ(state_m->id) + SQ(state_m->iq));
 	state_m->i_abs_filter = sqrtf(SQ(state_m->id_filter) + SQ(state_m->iq_filter));
 
-    // Inverse Park transform: transforms the (normalized) voltages from the rotor reference frame to the stator frame 
+    // Inverse Park transform: transforms the (normalized) voltages from the rotor reference frame to the stator frame
 	float mod_alpha = c * state_m->mod_d - s * state_m->mod_q;
 	float mod_beta  = c * state_m->mod_q + s * state_m->mod_d;
 
@@ -4087,7 +4263,7 @@ static void control_current(volatile motor_all_state_t *motor, float dt) {
 	// Set output (HW Dependent)
 	uint32_t duty1, duty2, duty3, top;
 	top = TIM1->ARR;
-    
+
     // Calculate the duty cycles for all the phases. This also injects a zero modulation signal to
 	// be able to fully utilize the bus voltage. See https://microchipdeveloper.com/mct5001:start
 	svm(mod_alpha, mod_beta, top, &duty1, &duty2, &duty3, (uint32_t*)&state_m->svm_sector);
@@ -4267,8 +4443,8 @@ static void update_valpha_vbeta(volatile motor_all_state_t *motor, float mod_alp
  * @param beta Park transformed and normalized voltage
  * @param PWMFullDutyCycle is the peak value of the PWM counter.
  * @param tAout PWM duty cycle phase A (0 = off all of the time, PWMFullDutyCycle = on all of the time)
- * @param tBout PWM duty cycle phase B 
- * @param tCout PWM duty cycle phase C 
+ * @param tBout PWM duty cycle phase B
+ * @param tCout PWM duty cycle phase C
  */
 static void svm(float alpha, float beta, uint32_t PWMFullDutyCycle,
 				uint32_t* tAout, uint32_t* tBout, uint32_t* tCout, uint32_t *svm_sector) {
@@ -4865,3 +5041,6 @@ static void terminal_plot_hfi(int argc, const char **argv) {
 		commands_printf("This command requires one argument.\n");
 	}
 }
+
+#pragma GCC pop_options
+

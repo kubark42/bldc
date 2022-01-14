@@ -58,42 +58,41 @@ void ledpwm_set_intensity(unsigned int led, float intensity) {
 	led_values[led] = gamma_table[(int)(intensity * LEDPWM_CNT_TOP)];
 }
 
-void ledpwm_led_on(int led) {
-	if (led >= LEDPWM_LED_NUM) {
-		return;
-	}
-
-	led_values[led] = LEDPWM_CNT_TOP;
-}
-
-void ledpwm_led_off(int led) {
-	if (led >= LEDPWM_LED_NUM) {
-		return;
-	}
-
-	led_values[led] = 0;
-}
-
 /*
  * Call this function as fast as possible, with a deterministic rate.
  */
 void ledpwm_update_pwm(void) {
 	static int cnt = 0;
+//   static bool isGreenOff = true;
+//   static bool isRedOff = true;
+
 	cnt++;
 	if (cnt == LEDPWM_CNT_TOP) {
 		cnt = 0;
 	}
 
 	if (cnt >= led_values[LED_GREEN]) {
-		LED_GREEN_OFF();
+//      if (isGreenOff != true) {
+         LED_GREEN_OFF();
+//         isGreenOff = true;
+//      }
 	} else {
-		LED_GREEN_ON();
+//      if (isGreenOff == true) {
+   		LED_GREEN_ON();
+//         isGreenOff = false;
+//      }
 	}
 
 	if (cnt >= led_values[LED_RED]) {
-		LED_RED_OFF();
+//      if (isRedOff =! true) {
+   		LED_RED_OFF();
+//         isRedOff = true;
+//      }
 	} else {
-		LED_RED_ON();
+//      if (isRedOff == true) {
+   		LED_RED_ON();
+//         isRedOff = false;
+//      }
 	}
 
 #ifdef LED_PWM1_ON

@@ -135,6 +135,7 @@ void conf_general_init(void) {
  * a page swap might longer than the capacitors have voltage left, which could make cause the motor and
  * app config to get lost.
  */
+// REALLY?
 bool conf_general_store_backup_data(void) {
 	timeout_configure_IWDT_slowest();
 

@@ -1255,7 +1255,12 @@ int mc_interface_get_tachometer_abs_value(bool reset) {
 	return ret;
 }
 
-float mc_interface_get_last_inj_adc_isr_duration(void) {
+uint32_t *mc_interface_get_last_inj_adc_isr_duration_ticks(void) {
+   return mcpwm_foc_get_last_adc_isr_duration_ticks();
+
+}
+
+float mc_interface_get_last_inj_adc_isr_duration_sec(void) {
 	float ret = 0.0;
 
 	switch (motor_now()->m_conf.motor_type) {
@@ -1265,7 +1270,7 @@ float mc_interface_get_last_inj_adc_isr_duration(void) {
 		break;
 
 	case MOTOR_TYPE_FOC:
-		ret = mcpwm_foc_get_last_adc_isr_duration();
+		ret = mcpwm_foc_get_last_adc_isr_duration_sec();
 		break;
 
 	case MOTOR_TYPE_GPD:
@@ -1753,9 +1758,10 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 
 		const float max_voltage = (conf_now->l_max_vin * 0.05);
 		if (wrong_voltage_integrator > max_voltage) {
+#ifndef BRAIN_ONLY
 			mc_interface_fault_stop(input_voltage < conf_now->l_min_vin ?
 					FAULT_CODE_UNDER_VOLTAGE : FAULT_CODE_OVER_VOLTAGE, is_second_motor, true);
-
+#endif
 			// Windup protection
 			wrong_voltage_integrator = max_voltage * 2.0;
 		}
@@ -2044,7 +2050,7 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 
 			m_sample_now++;
 
-			m_last_adc_duration_sample = mc_interface_get_last_inj_adc_isr_duration();
+			m_last_adc_duration_sample = mc_interface_get_last_inj_adc_isr_duration_sec();
 		}
 	}
 }
