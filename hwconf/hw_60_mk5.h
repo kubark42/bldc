@@ -20,6 +20,8 @@
 #ifndef HW_60_H_
 #define HW_60_H_
 
+#define HW60_IS_MK5
+
 #ifdef HW60_IS_MK3
 #define HW_NAME					"60_MK3"
 #elif defined(HW60_IS_MK4)
@@ -285,7 +287,6 @@
 #endif
 
 // SPI pins
-#if !defined(HW60_IS_MK5)
 #define HW_SPI_DEV				SPID1
 #define HW_SPI_GPIO_AF			GPIO_AF_SPI1
 #define HW_SPI_PORT_NSS			GPIOA
@@ -296,18 +297,6 @@
 #define HW_SPI_PIN_MOSI			7
 #define HW_SPI_PORT_MISO		GPIOA
 #define HW_SPI_PIN_MISO			6
-#else
-#define HW_SPI_DEV				SPID1
-#define HW_SPI_GPIO_AF			GPIO_AF_SPI1
-#define HW_SPI_PORT_NSS			GPIOB
-#define HW_SPI_PIN_NSS			11
-#define HW_SPI_PORT_SCK			GPIOA
-#define HW_SPI_PIN_SCK			5
-#define HW_SPI_PORT_MOSI		GPIOA
-#define HW_SPI_PIN_MOSI			7
-#define HW_SPI_PORT_MISO		GPIOA
-#define HW_SPI_PIN_MISO			6
-#endif
 
 // SPI for DRV8301
 #if !defined(HW60_IS_MK3) && !defined(HW60_IS_MK4) && !defined(HW60_IS_MK5)
