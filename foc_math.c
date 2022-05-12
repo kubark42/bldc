@@ -21,6 +21,9 @@
 #include "utils_math.h"
 #include <math.h>
 
+extern observer_values localObserverValues;
+
+
 // See http://cas.ensmp.fr/~praly/Telechargement/Journaux/2010-IEEE_TPEL-Lee-Hong-Nam-Ortega-Praly-Astolfi.pdf
 void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_beta,
 		float dt, float *x1, float *x2, float *phase, motor_all_state_t *motor) {
@@ -75,6 +78,20 @@ void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_bet
 
 		*x1 += x1_dot * dt;
 		*x2 += x2_dot * dt;
+
+		localObserverValues.v_alpha = v_alpha;
+		localObserverValues.v_beta = v_beta;
+		localObserverValues.i_alpha = i_alpha;
+		localObserverValues.i_beta = i_beta;
+		localObserverValues.i_d = id;
+		localObserverValues.i_q = iq;
+		localObserverValues.x1 = *x1;
+		localObserverValues.x2 = *x2;
+		localObserverValues.L = L;
+		localObserverValues.R = R;
+		localObserverValues.comp_fact = comp_fact;
+		localObserverValues.lambda = lambda;
+		localObserverValues.gamma_half = gamma_half;
 	} break;
 
 	default:

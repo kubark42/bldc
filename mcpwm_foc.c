@@ -1309,6 +1309,12 @@ int mcpwm_foc_get_tachometer_abs_value(bool reset) {
 	return val;
 }
 
+observer_values localObserverValues;
+
+observer_values mcpwm_foc_get_observer_struct(void) {
+	return localObserverValues;
+}
+
 /**
  * Read the motor phase.
  *

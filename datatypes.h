@@ -1360,6 +1360,22 @@ typedef struct {
 	float max_current;
 } setup_stats;
 
+typedef struct {
+	float v_alpha;
+	float v_beta;
+	float i_alpha;
+	float i_beta;
+	float i_d;
+	float i_q;
+	float L;
+	float R;
+	float x1;
+	float x2;
+	float comp_fact;
+	float gamma_half;
+	float lambda;
+} observer_values;
+
 #define BACKUP_VAR_INIT_CODE				92891934
 
 typedef struct __attribute__((packed)) {

@@ -2031,6 +2031,20 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 			m_f_sw_samples[m_sample_now] = (int16_t)(0.1 / t_samp);
 			m_status_samples[m_sample_now] = mcpwm_get_comm_step() | (mcpwm_read_hall_phase() << 3);
 
+			observer_values observerValues = mcpwm_foc_get_observer_struct();
+
+			m_curr0_samples[m_sample_now] = observerValues.v_alpha;
+			m_curr1_samples[m_sample_now] = observerValues.v_beta;
+			m_ph1_samples[m_sample_now] = observerValues.i_alpha;
+			m_ph2_samples[m_sample_now] = observerValues.i_beta;
+			m_ph3_samples[m_sample_now] = observerValues.gamma_half;
+			m_vzero_samples[m_sample_now] = observerValues.comp_fact;
+			m_status_samples[m_sample_now] = observerValues.R;  // unsigned 8-bit value
+			m_curr_fir_samples[m_sample_now] = observerValues.x1;
+			m_f_sw_samples[m_sample_now] = observerValues.x2;
+			m_phase_samples[m_sample_now] = (uint8_t)(mcpwm_foc_get_phase_observer() / 360.0 * 250.0);
+
+
 			m_sample_now++;
 
 			m_last_adc_duration_sample = mc_interface_get_last_inj_adc_isr_duration();
