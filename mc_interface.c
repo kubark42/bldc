@@ -2037,11 +2037,11 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 			m_curr1_samples[m_sample_now] = observerValues.v_beta * 100;
 			m_ph1_samples[m_sample_now] = observerValues.i_alpha * 10;
 			m_ph2_samples[m_sample_now] = observerValues.i_beta * 10;
-			m_ph3_samples[m_sample_now] = observerValues.gamma_half * 1000000.0f*1000.0f;
+			m_ph3_samples[m_sample_now] = observerValues.gamma_half / 10000.0f;
 			m_vzero_samples[m_sample_now] = observerValues.comp_fact * 10000;
-			m_status_samples[m_sample_now] = observerValues.R * 1000;  // unsigned 8-bit value
-			m_curr_fir_samples[m_sample_now] = observerValues.x1 * 1000;
-			m_f_sw_samples[m_sample_now] = observerValues.x2 * 1000;
+			m_status_samples[m_sample_now] = observerValues.R * 100000;  // unsigned 8-bit value
+			m_curr_fir_samples[m_sample_now] = observerValues.x1 * 1000.0f * 1000.0f;
+			m_f_sw_samples[m_sample_now] = observerValues.x2 * 1000.0f * 1000.0f;
 			m_phase_samples[m_sample_now] = (uint8_t)(mcpwm_foc_get_phase_observer() / 360.0 * 250.0);
 
 
