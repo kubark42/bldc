@@ -1371,9 +1371,12 @@ typedef struct {
 	float R;
 	float x1;
 	float x2;
+	float x1_old;
+	float x2_old;
 	float comp_fact;
 	float gamma_half;
 	float lambda;
+	float err;
 } observer_values;
 
 #define BACKUP_VAR_INIT_CODE				92891934

@@ -76,6 +76,9 @@ void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_bet
 		float x1_dot = v_alpha - R_ia + gamma_half * (*x1 - L_ia) * err;
 		float x2_dot = v_beta - R_ib + gamma_half * (*x2 - L_ib) * err;
 
+		localObserverValues.x1_old = *x1;
+		localObserverValues.x2_old = *x2;
+
 		*x1 += x1_dot * dt;
 		*x2 += x2_dot * dt;
 
@@ -85,10 +88,9 @@ void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_bet
 		localObserverValues.i_beta = i_beta;
 		localObserverValues.i_d = id;
 		localObserverValues.i_q = iq;
-		localObserverValues.x1 = *x1;
-		localObserverValues.x2 = *x2;
 		localObserverValues.L = L;
 		localObserverValues.R = R;
+		localObserverValues.err = err;
 		localObserverValues.comp_fact = comp_fact;
 		localObserverValues.lambda = lambda;
 		localObserverValues.gamma_half = gamma_half;
@@ -107,6 +109,9 @@ void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_bet
 		*x1 *= 1.1;
 		*x2 *= 1.1;
 	}
+
+	localObserverValues.x1 = *x1;
+	localObserverValues.x2 = *x2;
 
 	if (phase) {
 		*phase = utils_fast_atan2(*x2 - L_ib, *x1 - L_ia);
