@@ -1377,6 +1377,7 @@ typedef struct {
 	float gamma_half;
 	float lambda;
 	float err;
+	uint32_t loopIdx;
 } observer_values;
 
 #define BACKUP_VAR_INIT_CODE				92891934

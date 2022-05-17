@@ -82,6 +82,9 @@ void foc_observer_update(float v_alpha, float v_beta, float i_alpha, float i_bet
 		*x1 += x1_dot * dt;
 		*x2 += x2_dot * dt;
 
+		static uint32_t loopIdx = 0;
+
+		localObserverValues.loopIdx = loopIdx++;
 		localObserverValues.v_alpha = v_alpha;
 		localObserverValues.v_beta = v_beta;
 		localObserverValues.i_alpha = i_alpha;
